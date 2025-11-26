@@ -1,0 +1,10 @@
+[2025-11-03 19:04:51,673][__main__][INFO] - Reading 35454 samples from SceneFlow.
+[2025-11-03 19:04:53,799][__main__][INFO] - Reading 4370 samples from SceneFlow.
+[2025-11-03 19:04:53,812][__main__][INFO] - Reading 200 samples from KITTI.
+[2025-11-03 19:04:53,824][__main__][INFO] - Reading 15 samples from Middlebury.
+[2025-11-03 19:04:53,832][__main__][INFO] - Reading 27 samples from ETH3D.
+[2025-11-03 19:04:54,149][dinov2][INFO] - using MLP layer as FFN
+[2025-11-03 19:04:54,149][dinov2][INFO] - using MLP layer as FFN
+[2025-11-03 19:04:54,150][dinov2][INFO] - using MLP layer as FFN
+[2025-11-03 19:04:54,156][dinov2][INFO] - using MLP layer as FFN
+[2025-11-03 19:05:05,978][__main__][INFO] - Loading model from PromptStereo.

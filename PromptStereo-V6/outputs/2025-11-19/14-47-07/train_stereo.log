@@ -1,0 +1,212 @@
+[2025-11-19 14:47:25,725][__main__][INFO] - Reading 35454 samples from SceneFlow.
+[2025-11-19 14:47:28,438][__main__][INFO] - Reading 4370 samples from SceneFlow.
+[2025-11-19 14:47:28,449][__main__][INFO] - Reading 200 samples from KITTI.
+[2025-11-19 14:47:28,461][__main__][INFO] - Reading 15 samples from Middlebury.
+[2025-11-19 14:47:28,486][__main__][INFO] - Reading 27 samples from ETH3D.
+[2025-11-19 14:47:28,934][dinov2][INFO] - using MLP layer as FFN
+[2025-11-19 14:47:28,966][dinov2][INFO] - using MLP layer as FFN
+[2025-11-19 14:47:28,974][dinov2][INFO] - using MLP layer as FFN
+[2025-11-19 14:47:28,977][dinov2][INFO] - using MLP layer as FFN
+[2025-11-19 14:47:40,955][__main__][INFO] - Loading model from PromptStereo.
+[2025-11-19 14:47:41,875][__main__][INFO] - Loading checkpoint from /data/wxq/checkpoint/promptstereo-v6/model.safetensors.
+[2025-11-19 17:02:46,716][accelerate.accelerator][INFO] - Saving current state to /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/10000
+[2025-11-19 17:02:48,520][accelerate.checkpointing][INFO] - Model weights saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/10000/model.safetensors
+[2025-11-19 17:02:49,050][accelerate.checkpointing][INFO] - Optimizer state saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/10000/optimizer.bin
+[2025-11-19 17:02:49,050][accelerate.checkpointing][INFO] - Scheduler state saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/10000/scheduler.bin
+[2025-11-19 17:02:49,051][accelerate.checkpointing][INFO] - Sampler state for dataloader 0 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/10000/sampler.bin
+[2025-11-19 17:02:49,051][accelerate.checkpointing][INFO] - Sampler state for dataloader 1 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/10000/sampler_1.bin
+[2025-11-19 17:02:49,051][accelerate.checkpointing][INFO] - Sampler state for dataloader 2 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/10000/sampler_2.bin
+[2025-11-19 17:02:49,051][accelerate.checkpointing][INFO] - Sampler state for dataloader 3 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/10000/sampler_3.bin
+[2025-11-19 17:02:49,051][accelerate.checkpointing][INFO] - Sampler state for dataloader 4 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/10000/sampler_4.bin
+[2025-11-19 17:02:49,053][accelerate.checkpointing][INFO] - Random states saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/10000/random_states_0.pkl
+[2025-11-19 19:26:27,815][accelerate.accelerator][INFO] - Saving current state to /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/20000
+[2025-11-19 19:26:29,648][accelerate.checkpointing][INFO] - Model weights saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/20000/model.safetensors
+[2025-11-19 19:26:30,180][accelerate.checkpointing][INFO] - Optimizer state saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/20000/optimizer.bin
+[2025-11-19 19:26:30,180][accelerate.checkpointing][INFO] - Scheduler state saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/20000/scheduler.bin
+[2025-11-19 19:26:30,180][accelerate.checkpointing][INFO] - Sampler state for dataloader 0 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/20000/sampler.bin
+[2025-11-19 19:26:30,181][accelerate.checkpointing][INFO] - Sampler state for dataloader 1 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/20000/sampler_1.bin
+[2025-11-19 19:26:30,181][accelerate.checkpointing][INFO] - Sampler state for dataloader 2 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/20000/sampler_2.bin
+[2025-11-19 19:26:30,181][accelerate.checkpointing][INFO] - Sampler state for dataloader 3 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/20000/sampler_3.bin
+[2025-11-19 19:26:30,181][accelerate.checkpointing][INFO] - Sampler state for dataloader 4 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/20000/sampler_4.bin
+[2025-11-19 19:26:30,182][accelerate.checkpointing][INFO] - Random states saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/20000/random_states_0.pkl
+[2025-11-19 21:48:32,069][accelerate.accelerator][INFO] - Saving current state to /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/30000
+[2025-11-19 21:48:34,199][accelerate.checkpointing][INFO] - Model weights saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/30000/model.safetensors
+[2025-11-19 21:48:34,775][accelerate.checkpointing][INFO] - Optimizer state saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/30000/optimizer.bin
+[2025-11-19 21:48:34,776][accelerate.checkpointing][INFO] - Scheduler state saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/30000/scheduler.bin
+[2025-11-19 21:48:34,777][accelerate.checkpointing][INFO] - Sampler state for dataloader 0 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/30000/sampler.bin
+[2025-11-19 21:48:34,777][accelerate.checkpointing][INFO] - Sampler state for dataloader 1 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/30000/sampler_1.bin
+[2025-11-19 21:48:34,778][accelerate.checkpointing][INFO] - Sampler state for dataloader 2 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/30000/sampler_2.bin
+[2025-11-19 21:48:34,778][accelerate.checkpointing][INFO] - Sampler state for dataloader 3 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/30000/sampler_3.bin
+[2025-11-19 21:48:34,779][accelerate.checkpointing][INFO] - Sampler state for dataloader 4 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/30000/sampler_4.bin
+[2025-11-19 21:48:34,781][accelerate.checkpointing][INFO] - Random states saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/30000/random_states_0.pkl
+[2025-11-20 00:10:45,025][accelerate.accelerator][INFO] - Saving current state to /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/40000
+[2025-11-20 00:10:47,118][accelerate.checkpointing][INFO] - Model weights saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/40000/model.safetensors
+[2025-11-20 00:10:47,657][accelerate.checkpointing][INFO] - Optimizer state saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/40000/optimizer.bin
+[2025-11-20 00:10:47,658][accelerate.checkpointing][INFO] - Scheduler state saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/40000/scheduler.bin
+[2025-11-20 00:10:47,658][accelerate.checkpointing][INFO] - Sampler state for dataloader 0 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/40000/sampler.bin
+[2025-11-20 00:10:47,658][accelerate.checkpointing][INFO] - Sampler state for dataloader 1 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/40000/sampler_1.bin
+[2025-11-20 00:10:47,658][accelerate.checkpointing][INFO] - Sampler state for dataloader 2 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/40000/sampler_2.bin
+[2025-11-20 00:10:47,658][accelerate.checkpointing][INFO] - Sampler state for dataloader 3 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/40000/sampler_3.bin
+[2025-11-20 00:10:47,659][accelerate.checkpointing][INFO] - Sampler state for dataloader 4 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/40000/sampler_4.bin
+[2025-11-20 00:10:47,660][accelerate.checkpointing][INFO] - Random states saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/40000/random_states_0.pkl
+[2025-11-20 02:31:42,626][accelerate.accelerator][INFO] - Saving current state to /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/50000
+[2025-11-20 02:31:44,421][accelerate.checkpointing][INFO] - Model weights saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/50000/model.safetensors
+[2025-11-20 02:31:44,957][accelerate.checkpointing][INFO] - Optimizer state saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/50000/optimizer.bin
+[2025-11-20 02:31:44,958][accelerate.checkpointing][INFO] - Scheduler state saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/50000/scheduler.bin
+[2025-11-20 02:31:44,958][accelerate.checkpointing][INFO] - Sampler state for dataloader 0 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/50000/sampler.bin
+[2025-11-20 02:31:44,958][accelerate.checkpointing][INFO] - Sampler state for dataloader 1 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/50000/sampler_1.bin
+[2025-11-20 02:31:44,958][accelerate.checkpointing][INFO] - Sampler state for dataloader 2 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/50000/sampler_2.bin
+[2025-11-20 02:31:44,958][accelerate.checkpointing][INFO] - Sampler state for dataloader 3 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/50000/sampler_3.bin
+[2025-11-20 02:31:44,958][accelerate.checkpointing][INFO] - Sampler state for dataloader 4 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/50000/sampler_4.bin
+[2025-11-20 02:31:44,960][accelerate.checkpointing][INFO] - Random states saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/50000/random_states_0.pkl
+[2025-11-20 04:52:55,247][accelerate.accelerator][INFO] - Saving current state to /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/60000
+[2025-11-20 04:52:57,226][accelerate.checkpointing][INFO] - Model weights saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/60000/model.safetensors
+[2025-11-20 04:52:57,772][accelerate.checkpointing][INFO] - Optimizer state saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/60000/optimizer.bin
+[2025-11-20 04:52:57,773][accelerate.checkpointing][INFO] - Scheduler state saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/60000/scheduler.bin
+[2025-11-20 04:52:57,773][accelerate.checkpointing][INFO] - Sampler state for dataloader 0 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/60000/sampler.bin
+[2025-11-20 04:52:57,773][accelerate.checkpointing][INFO] - Sampler state for dataloader 1 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/60000/sampler_1.bin
+[2025-11-20 04:52:57,774][accelerate.checkpointing][INFO] - Sampler state for dataloader 2 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/60000/sampler_2.bin
+[2025-11-20 04:52:57,774][accelerate.checkpointing][INFO] - Sampler state for dataloader 3 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/60000/sampler_3.bin
+[2025-11-20 04:52:57,774][accelerate.checkpointing][INFO] - Sampler state for dataloader 4 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/60000/sampler_4.bin
+[2025-11-20 04:52:57,776][accelerate.checkpointing][INFO] - Random states saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/60000/random_states_0.pkl
+[2025-11-20 07:13:38,350][accelerate.accelerator][INFO] - Saving current state to /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/70000
+[2025-11-20 07:13:40,226][accelerate.checkpointing][INFO] - Model weights saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/70000/model.safetensors
+[2025-11-20 07:13:40,786][accelerate.checkpointing][INFO] - Optimizer state saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/70000/optimizer.bin
+[2025-11-20 07:13:40,787][accelerate.checkpointing][INFO] - Scheduler state saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/70000/scheduler.bin
+[2025-11-20 07:13:40,787][accelerate.checkpointing][INFO] - Sampler state for dataloader 0 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/70000/sampler.bin
+[2025-11-20 07:13:40,787][accelerate.checkpointing][INFO] - Sampler state for dataloader 1 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/70000/sampler_1.bin
+[2025-11-20 07:13:40,788][accelerate.checkpointing][INFO] - Sampler state for dataloader 2 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/70000/sampler_2.bin
+[2025-11-20 07:13:40,788][accelerate.checkpointing][INFO] - Sampler state for dataloader 3 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/70000/sampler_3.bin
+[2025-11-20 07:13:40,788][accelerate.checkpointing][INFO] - Sampler state for dataloader 4 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/70000/sampler_4.bin
+[2025-11-20 07:13:40,789][accelerate.checkpointing][INFO] - Random states saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/70000/random_states_0.pkl
+[2025-11-20 09:34:40,443][accelerate.accelerator][INFO] - Saving current state to /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/80000
+[2025-11-20 09:34:42,441][accelerate.checkpointing][INFO] - Model weights saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/80000/model.safetensors
+[2025-11-20 09:34:43,062][accelerate.checkpointing][INFO] - Optimizer state saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/80000/optimizer.bin
+[2025-11-20 09:34:43,062][accelerate.checkpointing][INFO] - Scheduler state saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/80000/scheduler.bin
+[2025-11-20 09:34:43,063][accelerate.checkpointing][INFO] - Sampler state for dataloader 0 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/80000/sampler.bin
+[2025-11-20 09:34:43,063][accelerate.checkpointing][INFO] - Sampler state for dataloader 1 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/80000/sampler_1.bin
+[2025-11-20 09:34:43,063][accelerate.checkpointing][INFO] - Sampler state for dataloader 2 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/80000/sampler_2.bin
+[2025-11-20 09:34:43,063][accelerate.checkpointing][INFO] - Sampler state for dataloader 3 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/80000/sampler_3.bin
+[2025-11-20 09:34:43,063][accelerate.checkpointing][INFO] - Sampler state for dataloader 4 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/80000/sampler_4.bin
+[2025-11-20 09:34:43,065][accelerate.checkpointing][INFO] - Random states saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/80000/random_states_0.pkl
+[2025-11-20 11:53:53,010][accelerate.accelerator][INFO] - Saving current state to /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/90000
+[2025-11-20 11:53:54,789][accelerate.checkpointing][INFO] - Model weights saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/90000/model.safetensors
+[2025-11-20 11:53:55,352][accelerate.checkpointing][INFO] - Optimizer state saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/90000/optimizer.bin
+[2025-11-20 11:53:55,352][accelerate.checkpointing][INFO] - Scheduler state saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/90000/scheduler.bin
+[2025-11-20 11:53:55,353][accelerate.checkpointing][INFO] - Sampler state for dataloader 0 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/90000/sampler.bin
+[2025-11-20 11:53:55,353][accelerate.checkpointing][INFO] - Sampler state for dataloader 1 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/90000/sampler_1.bin
+[2025-11-20 11:53:55,353][accelerate.checkpointing][INFO] - Sampler state for dataloader 2 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/90000/sampler_2.bin
+[2025-11-20 11:53:55,353][accelerate.checkpointing][INFO] - Sampler state for dataloader 3 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/90000/sampler_3.bin
+[2025-11-20 11:53:55,354][accelerate.checkpointing][INFO] - Sampler state for dataloader 4 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/90000/sampler_4.bin
+[2025-11-20 11:53:55,355][accelerate.checkpointing][INFO] - Random states saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/90000/random_states_0.pkl
+[2025-11-20 14:14:40,351][accelerate.accelerator][INFO] - Saving current state to /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/100000
+[2025-11-20 14:14:42,498][accelerate.checkpointing][INFO] - Model weights saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/100000/model.safetensors
+[2025-11-20 14:14:43,088][accelerate.checkpointing][INFO] - Optimizer state saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/100000/optimizer.bin
+[2025-11-20 14:14:43,089][accelerate.checkpointing][INFO] - Scheduler state saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/100000/scheduler.bin
+[2025-11-20 14:14:43,089][accelerate.checkpointing][INFO] - Sampler state for dataloader 0 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/100000/sampler.bin
+[2025-11-20 14:14:43,089][accelerate.checkpointing][INFO] - Sampler state for dataloader 1 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/100000/sampler_1.bin
+[2025-11-20 14:14:43,090][accelerate.checkpointing][INFO] - Sampler state for dataloader 2 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/100000/sampler_2.bin
+[2025-11-20 14:14:43,090][accelerate.checkpointing][INFO] - Sampler state for dataloader 3 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/100000/sampler_3.bin
+[2025-11-20 14:14:43,090][accelerate.checkpointing][INFO] - Sampler state for dataloader 4 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/100000/sampler_4.bin
+[2025-11-20 14:14:43,092][accelerate.checkpointing][INFO] - Random states saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/100000/random_states_0.pkl
+[2025-11-20 16:35:08,235][accelerate.accelerator][INFO] - Saving current state to /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/110000
+[2025-11-20 16:35:10,214][accelerate.checkpointing][INFO] - Model weights saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/110000/model.safetensors
+[2025-11-20 16:35:10,755][accelerate.checkpointing][INFO] - Optimizer state saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/110000/optimizer.bin
+[2025-11-20 16:35:10,756][accelerate.checkpointing][INFO] - Scheduler state saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/110000/scheduler.bin
+[2025-11-20 16:35:10,756][accelerate.checkpointing][INFO] - Sampler state for dataloader 0 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/110000/sampler.bin
+[2025-11-20 16:35:10,756][accelerate.checkpointing][INFO] - Sampler state for dataloader 1 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/110000/sampler_1.bin
+[2025-11-20 16:35:10,756][accelerate.checkpointing][INFO] - Sampler state for dataloader 2 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/110000/sampler_2.bin
+[2025-11-20 16:35:10,756][accelerate.checkpointing][INFO] - Sampler state for dataloader 3 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/110000/sampler_3.bin
+[2025-11-20 16:35:10,757][accelerate.checkpointing][INFO] - Sampler state for dataloader 4 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/110000/sampler_4.bin
+[2025-11-20 16:35:10,758][accelerate.checkpointing][INFO] - Random states saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/110000/random_states_0.pkl
+[2025-11-20 18:56:50,729][accelerate.accelerator][INFO] - Saving current state to /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/120000
+[2025-11-20 18:56:52,510][accelerate.checkpointing][INFO] - Model weights saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/120000/model.safetensors
+[2025-11-20 18:56:53,043][accelerate.checkpointing][INFO] - Optimizer state saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/120000/optimizer.bin
+[2025-11-20 18:56:53,044][accelerate.checkpointing][INFO] - Scheduler state saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/120000/scheduler.bin
+[2025-11-20 18:56:53,044][accelerate.checkpointing][INFO] - Sampler state for dataloader 0 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/120000/sampler.bin
+[2025-11-20 18:56:53,045][accelerate.checkpointing][INFO] - Sampler state for dataloader 1 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/120000/sampler_1.bin
+[2025-11-20 18:56:53,045][accelerate.checkpointing][INFO] - Sampler state for dataloader 2 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/120000/sampler_2.bin
+[2025-11-20 18:56:53,045][accelerate.checkpointing][INFO] - Sampler state for dataloader 3 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/120000/sampler_3.bin
+[2025-11-20 18:56:53,045][accelerate.checkpointing][INFO] - Sampler state for dataloader 4 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/120000/sampler_4.bin
+[2025-11-20 18:56:53,047][accelerate.checkpointing][INFO] - Random states saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/120000/random_states_0.pkl
+[2025-11-20 21:20:14,739][accelerate.accelerator][INFO] - Saving current state to /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/130000
+[2025-11-20 21:20:17,085][accelerate.checkpointing][INFO] - Model weights saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/130000/model.safetensors
+[2025-11-20 21:20:17,652][accelerate.checkpointing][INFO] - Optimizer state saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/130000/optimizer.bin
+[2025-11-20 21:20:17,653][accelerate.checkpointing][INFO] - Scheduler state saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/130000/scheduler.bin
+[2025-11-20 21:20:17,653][accelerate.checkpointing][INFO] - Sampler state for dataloader 0 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/130000/sampler.bin
+[2025-11-20 21:20:17,653][accelerate.checkpointing][INFO] - Sampler state for dataloader 1 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/130000/sampler_1.bin
+[2025-11-20 21:20:17,653][accelerate.checkpointing][INFO] - Sampler state for dataloader 2 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/130000/sampler_2.bin
+[2025-11-20 21:20:17,654][accelerate.checkpointing][INFO] - Sampler state for dataloader 3 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/130000/sampler_3.bin
+[2025-11-20 21:20:17,654][accelerate.checkpointing][INFO] - Sampler state for dataloader 4 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/130000/sampler_4.bin
+[2025-11-20 21:20:17,655][accelerate.checkpointing][INFO] - Random states saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/130000/random_states_0.pkl
+[2025-11-20 23:41:38,795][accelerate.accelerator][INFO] - Saving current state to /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/140000
+[2025-11-20 23:41:40,642][accelerate.checkpointing][INFO] - Model weights saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/140000/model.safetensors
+[2025-11-20 23:41:41,173][accelerate.checkpointing][INFO] - Optimizer state saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/140000/optimizer.bin
+[2025-11-20 23:41:41,174][accelerate.checkpointing][INFO] - Scheduler state saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/140000/scheduler.bin
+[2025-11-20 23:41:41,174][accelerate.checkpointing][INFO] - Sampler state for dataloader 0 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/140000/sampler.bin
+[2025-11-20 23:41:41,174][accelerate.checkpointing][INFO] - Sampler state for dataloader 1 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/140000/sampler_1.bin
+[2025-11-20 23:41:41,175][accelerate.checkpointing][INFO] - Sampler state for dataloader 2 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/140000/sampler_2.bin
+[2025-11-20 23:41:41,175][accelerate.checkpointing][INFO] - Sampler state for dataloader 3 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/140000/sampler_3.bin
+[2025-11-20 23:41:41,175][accelerate.checkpointing][INFO] - Sampler state for dataloader 4 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/140000/sampler_4.bin
+[2025-11-20 23:41:41,177][accelerate.checkpointing][INFO] - Random states saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/140000/random_states_0.pkl
+[2025-11-21 02:02:59,349][accelerate.accelerator][INFO] - Saving current state to /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/150000
+[2025-11-21 02:03:01,155][accelerate.checkpointing][INFO] - Model weights saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/150000/model.safetensors
+[2025-11-21 02:03:01,707][accelerate.checkpointing][INFO] - Optimizer state saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/150000/optimizer.bin
+[2025-11-21 02:03:01,708][accelerate.checkpointing][INFO] - Scheduler state saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/150000/scheduler.bin
+[2025-11-21 02:03:01,708][accelerate.checkpointing][INFO] - Sampler state for dataloader 0 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/150000/sampler.bin
+[2025-11-21 02:03:01,708][accelerate.checkpointing][INFO] - Sampler state for dataloader 1 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/150000/sampler_1.bin
+[2025-11-21 02:03:01,709][accelerate.checkpointing][INFO] - Sampler state for dataloader 2 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/150000/sampler_2.bin
+[2025-11-21 02:03:01,710][accelerate.checkpointing][INFO] - Sampler state for dataloader 3 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/150000/sampler_3.bin
+[2025-11-21 02:03:01,710][accelerate.checkpointing][INFO] - Sampler state for dataloader 4 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/150000/sampler_4.bin
+[2025-11-21 02:03:01,712][accelerate.checkpointing][INFO] - Random states saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/150000/random_states_0.pkl
+[2025-11-21 04:23:31,344][accelerate.accelerator][INFO] - Saving current state to /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/160000
+[2025-11-21 04:23:33,181][accelerate.checkpointing][INFO] - Model weights saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/160000/model.safetensors
+[2025-11-21 04:23:33,717][accelerate.checkpointing][INFO] - Optimizer state saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/160000/optimizer.bin
+[2025-11-21 04:23:33,718][accelerate.checkpointing][INFO] - Scheduler state saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/160000/scheduler.bin
+[2025-11-21 04:23:33,718][accelerate.checkpointing][INFO] - Sampler state for dataloader 0 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/160000/sampler.bin
+[2025-11-21 04:23:33,718][accelerate.checkpointing][INFO] - Sampler state for dataloader 1 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/160000/sampler_1.bin
+[2025-11-21 04:23:33,719][accelerate.checkpointing][INFO] - Sampler state for dataloader 2 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/160000/sampler_2.bin
+[2025-11-21 04:23:33,719][accelerate.checkpointing][INFO] - Sampler state for dataloader 3 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/160000/sampler_3.bin
+[2025-11-21 04:23:33,719][accelerate.checkpointing][INFO] - Sampler state for dataloader 4 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/160000/sampler_4.bin
+[2025-11-21 04:23:33,721][accelerate.checkpointing][INFO] - Random states saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/160000/random_states_0.pkl
+[2025-11-21 06:44:17,613][accelerate.accelerator][INFO] - Saving current state to /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/170000
+[2025-11-21 06:44:19,613][accelerate.checkpointing][INFO] - Model weights saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/170000/model.safetensors
+[2025-11-21 06:44:20,178][accelerate.checkpointing][INFO] - Optimizer state saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/170000/optimizer.bin
+[2025-11-21 06:44:20,178][accelerate.checkpointing][INFO] - Scheduler state saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/170000/scheduler.bin
+[2025-11-21 06:44:20,179][accelerate.checkpointing][INFO] - Sampler state for dataloader 0 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/170000/sampler.bin
+[2025-11-21 06:44:20,179][accelerate.checkpointing][INFO] - Sampler state for dataloader 1 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/170000/sampler_1.bin
+[2025-11-21 06:44:20,179][accelerate.checkpointing][INFO] - Sampler state for dataloader 2 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/170000/sampler_2.bin
+[2025-11-21 06:44:20,180][accelerate.checkpointing][INFO] - Sampler state for dataloader 3 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/170000/sampler_3.bin
+[2025-11-21 06:44:20,180][accelerate.checkpointing][INFO] - Sampler state for dataloader 4 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/170000/sampler_4.bin
+[2025-11-21 06:44:20,181][accelerate.checkpointing][INFO] - Random states saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/170000/random_states_0.pkl
+[2025-11-21 09:04:55,502][accelerate.accelerator][INFO] - Saving current state to /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/180000
+[2025-11-21 09:04:57,558][accelerate.checkpointing][INFO] - Model weights saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/180000/model.safetensors
+[2025-11-21 09:04:58,155][accelerate.checkpointing][INFO] - Optimizer state saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/180000/optimizer.bin
+[2025-11-21 09:04:58,156][accelerate.checkpointing][INFO] - Scheduler state saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/180000/scheduler.bin
+[2025-11-21 09:04:58,157][accelerate.checkpointing][INFO] - Sampler state for dataloader 0 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/180000/sampler.bin
+[2025-11-21 09:04:58,157][accelerate.checkpointing][INFO] - Sampler state for dataloader 1 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/180000/sampler_1.bin
+[2025-11-21 09:04:58,158][accelerate.checkpointing][INFO] - Sampler state for dataloader 2 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/180000/sampler_2.bin
+[2025-11-21 09:04:58,158][accelerate.checkpointing][INFO] - Sampler state for dataloader 3 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/180000/sampler_3.bin
+[2025-11-21 09:04:58,159][accelerate.checkpointing][INFO] - Sampler state for dataloader 4 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/180000/sampler_4.bin
+[2025-11-21 09:04:58,161][accelerate.checkpointing][INFO] - Random states saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/180000/random_states_0.pkl
+[2025-11-21 11:25:49,460][accelerate.accelerator][INFO] - Saving current state to /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/190000
+[2025-11-21 11:25:52,242][accelerate.checkpointing][INFO] - Model weights saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/190000/model.safetensors
+[2025-11-21 11:25:52,812][accelerate.checkpointing][INFO] - Optimizer state saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/190000/optimizer.bin
+[2025-11-21 11:25:52,813][accelerate.checkpointing][INFO] - Scheduler state saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/190000/scheduler.bin
+[2025-11-21 11:25:52,813][accelerate.checkpointing][INFO] - Sampler state for dataloader 0 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/190000/sampler.bin
+[2025-11-21 11:25:52,813][accelerate.checkpointing][INFO] - Sampler state for dataloader 1 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/190000/sampler_1.bin
+[2025-11-21 11:25:52,814][accelerate.checkpointing][INFO] - Sampler state for dataloader 2 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/190000/sampler_2.bin
+[2025-11-21 11:25:52,815][accelerate.checkpointing][INFO] - Sampler state for dataloader 3 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/190000/sampler_3.bin
+[2025-11-21 11:25:52,815][accelerate.checkpointing][INFO] - Sampler state for dataloader 4 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/190000/sampler_4.bin
+[2025-11-21 11:25:52,817][accelerate.checkpointing][INFO] - Random states saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/190000/random_states_0.pkl
+[2025-11-21 13:46:20,768][accelerate.accelerator][INFO] - Saving current state to /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/200000
+[2025-11-21 13:46:22,602][accelerate.checkpointing][INFO] - Model weights saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/200000/model.safetensors
+[2025-11-21 13:46:23,141][accelerate.checkpointing][INFO] - Optimizer state saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/200000/optimizer.bin
+[2025-11-21 13:46:23,142][accelerate.checkpointing][INFO] - Scheduler state saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/200000/scheduler.bin
+[2025-11-21 13:46:23,142][accelerate.checkpointing][INFO] - Sampler state for dataloader 0 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/200000/sampler.bin
+[2025-11-21 13:46:23,142][accelerate.checkpointing][INFO] - Sampler state for dataloader 1 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/200000/sampler_1.bin
+[2025-11-21 13:46:23,142][accelerate.checkpointing][INFO] - Sampler state for dataloader 2 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/200000/sampler_2.bin
+[2025-11-21 13:46:23,142][accelerate.checkpointing][INFO] - Sampler state for dataloader 3 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/200000/sampler_3.bin
+[2025-11-21 13:46:23,143][accelerate.checkpointing][INFO] - Sampler state for dataloader 4 saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/200000/sampler_4.bin
+[2025-11-21 13:46:23,144][accelerate.checkpointing][INFO] - Random states saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/200000/random_states_0.pkl
+[2025-11-21 13:54:57,213][accelerate.accelerator][INFO] - Model weights saved in /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/final/pytorch_model.bin

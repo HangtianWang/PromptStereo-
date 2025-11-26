@@ -1,0 +1,15 @@
+defaults:
+ - model: promptstereo
+ - _self_
+
+gpus: ${oc.env:CUDA_VISIBLE_DEVICES, '0,1,2,3'}
+checkpoint: /data/wxq/checkpoint/promptstereo-v6/exp9/final/model.safetensors
+
+accelerator:
+  _target_: accelerate.Accelerator
+
+left_list: /data/datasets/kitti/2015/training/image_2/*_10.png
+right_list: /data/datasets/kitti/2015/training/image_3/*_10.png
+
+disp_dir: result/kitti/2015/training/mono_1/error
+base_index: -1

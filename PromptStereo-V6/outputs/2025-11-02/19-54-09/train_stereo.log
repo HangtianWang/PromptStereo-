@@ -1,0 +1,10 @@
+[2025-11-02 19:54:16,670][dinov2][INFO] - using MLP layer as FFN
+[2025-11-02 19:54:16,711][__main__][INFO] - Reading 35454 samples from SceneFlow.
+[2025-11-02 19:54:16,731][__main__][INFO] - Reading 4370 samples from SceneFlow.
+[2025-11-02 19:54:16,733][__main__][INFO] - Reading 200 samples from KITTI.
+[2025-11-02 19:54:16,734][__main__][INFO] - Reading 15 samples from Middlebury.
+[2025-11-02 19:54:16,736][__main__][INFO] - Reading 27 samples from ETH3D.
+[2025-11-02 19:54:17,100][dinov2][INFO] - using MLP layer as FFN
+[2025-11-02 19:54:21,566][timm.models.helpers][INFO] - Loading pretrained weights from url (https://github.com/rwightman/pytorch-image-models/releases/download/v0.1-weights/mobilenetv2_100_ra-b33bc2c4.pth)
+[2025-11-02 19:54:22,096][timm.models.helpers][INFO] - Loading pretrained weights from url (https://github.com/rwightman/pytorch-image-models/releases/download/v0.1-weights/mobilenetv2_100_ra-b33bc2c4.pth)
+[2025-11-02 19:54:22,326][__main__][INFO] - Loading model from PromptStereo.
