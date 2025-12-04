@@ -97,6 +97,7 @@ def context_upsample(disp, weight, factor):
 
 def compute_scale_and_shift(disp):
     flat_disp = disp.flatten(2)
+    # 计算中位数
     shift = torch.nanquantile(flat_disp, 0.5, dim=2)
     scale = torch.abs(flat_disp - shift[..., None]).nanmean(dim=2)
     shift[shift.isnan()] = 0
@@ -110,3 +111,40 @@ def normalize_disparity(disp):
     norm_disp = (disp - shift[..., None, None]) / scale[..., None, None]
 
     return norm_disp.to(dtype), scale.to(dtype), shift.to(dtype)
+
+def compute_scale_shift(monocular_depth, gt_depth, mask=None):
+    """
+    计算 monocular depth 和 ground truth depth 之间的 scale 和 shift.
+    
+    参数:
+    monocular_depth (torch.Tensor): 单目深度图，形状为 (H, W) 或 (N, H, W)
+    gt_depth (torch.Tensor): ground truth 深度图，形状为 (H, W) 或 (N, H, W)
+    mask (torch.Tensor, optional): 有效区域的掩码，形状为 (H, W) 或 (N, H, W)
+    
+    返回:
+    scale (float): 计算得到的 scale
+    shift (float): 计算得到的 shift
+    """
+    
+    flattened_depth_maps = monocular_depth.clone().view(-1).contiguous()
+    sorted_depth_maps, _ = torch.sort(flattened_depth_maps)
+    percentile_10_index = int(0.2 * len(sorted_depth_maps))
+    threshold_10_percent = sorted_depth_maps[percentile_10_index]
+
+    if mask is None:
+        mask = (gt_depth > 0) & (monocular_depth > 1e-2) & (monocular_depth > threshold_10_percent)
+    
+    monocular_depth_flat = monocular_depth[mask]
+    gt_depth_flat = gt_depth[mask]
+    
+    X = torch.stack([monocular_depth_flat, torch.ones_like(monocular_depth_flat)], dim=1)
+    y = gt_depth_flat
+    
+    # 使用最小二乘法计算 [scale, shift]
+    A = torch.matmul(X.t(), X) + 1e-6 * torch.eye(2, device=X.device)
+    b = torch.matmul(X.t(), y)
+    params = torch.linalg.solve(A, b)
+    
+    scale, shift = params[0].item(), params[1].item()
+    
+    return scale, shift

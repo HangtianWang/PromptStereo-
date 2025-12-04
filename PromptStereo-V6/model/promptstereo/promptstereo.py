@@ -91,7 +91,7 @@ class PromptStereo(nn.Module):
         stem_left, left = normalize_image(left)
         stem_right, right = normalize_image(right)
         # 假设cfg.feat_dim为 [D0, D1, D2, D3]
-        # 单目深度图 [B, 1, H, W]
+        # 单目深度图 [B, 1, H/4, W/4]
         feat_mono, feat_stereo, depth = self.fnet(torch.cat((left, right), dim=0))
         # 单目特征图只取左侧
         # 单目特征组 [B,D3, H/4, W/4] [B, D3, H/8, W/8] [B, D3, H/16, W/16] [B, D3, H/32, W/32]
@@ -145,10 +145,13 @@ class PromptStereo(nn.Module):
         net = [block(torch.cat((x, y), dim=1)) for block, x, y in zip(self.hnet, ctx_left, warped_ctx_right)]
 
         # 单双目视差融合成迭代起点的初始视差+Structure Prompt的要求输入
+        # depth [B,1,H/4,W/4], init_disp [B,1,H/4,W/4]
         conf = self.conf(torch.cat((ctx_left[0], warped_ctx_right[0]), dim=1))
-        norm_depth, _, _ = normalize_disparity(depth)
-        _, scale, shift = normalize_disparity(init_disp)
-        aligned_depth = norm_depth * scale[..., None, None] + shift[..., None, None]
+        # norm_depth, _, _ = normalize_disparity(depth)
+        # _, scale, shift = normalize_disparity(init_disp)
+        # aligned_depth = norm_depth * scale[..., None, None] + shift[..., None, None]
+        scale, shift = compute_scale_shift(depth.clone().squeeze(1).to(torch.float32), init_disp.clone().squeeze(1).to(torch.float32))
+        aligned_depth = scale * depth + shift
 
         # 利用对齐后的单目视差图沿视差维度增强代价体，获得新的初始视差
         geometry_encoding_volume = self.disp_att(geometry_encoding_volume, aligned_depth)
