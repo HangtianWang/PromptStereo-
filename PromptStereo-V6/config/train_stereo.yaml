@@ -3,8 +3,9 @@ defaults:
   - _self_
 
 seed: 666
-gpus: ${oc.env:CUDA_VISIBLE_DEVICES, '0,1,2,3'}
-checkpoint: /data/wxq/checkpoint/promptstereo-v6/model.safetensors
+gpus: ${oc.env:CUDA_VISIBLE_DEVICES, '2,3'}
+# checkpoint: /data/wxq/checkpoint/promptstereo-v6/exp14/final/model.safetensors
+checkpoint: null
 
 accelerator:
   _target_: accelerate.Accelerator
@@ -19,47 +20,77 @@ tracker:
   project_name: PromptStereo-V6
   init_kwargs:
     wandb:
-      entity: windsrain
-      name: exp14-aug-init
+      entity: null
+      name: original-V0
+
+aug_params:
+  crop_size: [384, 768]
+  color_jitter:
+    brightness: [0.6, 1.4]
+    contrast: [0.6, 1.4]
+    saturation: [0, 1.4]
+    hue: 0.5
+    asymmetric_prob: 0.2
+  random_erase:
+    max_time: 2
+    bound: [50, 100]
+    prob: 0.5
+  random_scale:
+    min_scale: -0.2
+    max_scale: 0.4
+    max_stretch: 0.2
+    stretch_prob: 0.8
+    scale_prob: 1.0
+  y_jitter: True
 
 train_set:
+  # FoundationStereo:
+  #   instance:
+  #     _target_: dataset.stereo_dataset.FoundationStereo
+  #     aug_params: ${aug_params}
+  #     root: /mnt/truenas_nfs/dataset/foundationstereo
+  #     mask: null
+  # TartanAir:
+  #   instance:
+  #     _target_: dataset.stereo_dataset.TartanAir
+  #     aug_params: ${aug_params}
+  #     root: /data/datasets/tartanair
+  #     mask: null  
+  # CREStereo:
+  #   instance:
+  #     _target_: dataset.stereo_dataset.CREStereo
+  #     aug_params: ${aug_params}
+  #     root: /data/datasets/crestereo
+  #     mask: null
+  # FallingThings:
+  #   instance:
+  #     _target_: dataset.stereo_dataset.FallingThings
+  #     aug_params: ${aug_params}
+  #     root: /data/datasets/fallingthings
+  #     mask: null
   SceneFlow:
     instance:
       _target_: dataset.stereo_dataset.SceneFlow
-      aug_params:
-        crop_size: [384, 768]
-        color_jitter:
-          brightness: [0.6, 1.4]
-          contrast: [0.6, 1.4]
-          saturation: [0, 1.4]
-          hue: 0.5
-          # asymmetric_prob: 0.2
-          asymmetric_prob: 0.3
-        random_erase: null
-          # max_time: 2
-          # bound: [50, 100]
-          # prob: 0.5
-        random_scale:
-          min_scale: -0.2
-          # max_scale: 0.4
-          max_scale: 0.2
-          max_stretch: 0.2
-          stretch_prob: 0.8
-          # scale_prob: 1.0
-          scale_prob: 0.8
-        # y_jitter: True
-        y_jitter: False
-      root: /data/StereoData/sceneflow
+      aug_params: ${aug_params}
+      root: /data/StereoDatasets/sceneflow
       dstype: frames_finalpass
       things_test: False
-      mask: all
+      mask: null
+  # VKITTI2:
+  #   instance:
+  #     _target_: dataset.stereo_dataset.VKITTI2
+  #     aug_params: ${aug_params}
+  #     root: /data/datasets/vkitti2
+  #     mask: null
+
+weight: [1, 1, 2, 3, 5]
 
 valid_set:
   SceneFlow:
     outlier: 1
     instance:
       _target_: dataset.stereo_dataset.SceneFlow
-      root: /data/StereoData/sceneflow
+      root: /data/StereoDatasets/sceneflow
       dstype: frames_finalpass
       things_test: True
       mask: all
@@ -67,7 +98,7 @@ valid_set:
     outlier: 3
     instance:
       _target_: dataset.stereo_dataset.KITTI
-      root: /data/StereoData/kitti
+      root: /data/StereoDatasets/kitti
       year: '2015'
       split: training
       mask: all
@@ -75,7 +106,7 @@ valid_set:
     outlier: 2
     instance:
       _target_: dataset.stereo_dataset.Middlebury
-      root: /data/StereoData/middlebury
+      root: /data/StereoDatasets/middlebury
       year: MiddEval3
       split: training
       resolution: H
@@ -84,14 +115,14 @@ valid_set:
     outlier: 1
     instance:
       _target_: dataset.stereo_dataset.ETH3D
-      root: /data/StereoData/eth3d
+      root: /data/StereoDatasets/eth3d
       split: training
       mask: noc
 
 train_loader:
   split: False
   batch_size_per_gpu: null
-  total_batch_size: 8
+  total_batch_size: 2
   param:
     batch_size: null
     num_workers: null
@@ -125,5 +156,5 @@ scheduler:
 max_disp: 192
 max_norm: 1.0
 save_freq: 10000
-save_path: /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init
+save_path: /data/wht/checkpoints/promptstereo/
 valid_freq: 10000

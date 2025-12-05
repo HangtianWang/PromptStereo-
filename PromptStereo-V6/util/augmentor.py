@@ -3,9 +3,8 @@ import numpy as np
 from PIL import Image
 from torchvision.transforms import ColorJitter
 
-import albumentations as A
-
 class Augmentor:
+
     def __init__(self, sparse, aug_params):
         self.sparse = sparse
         self.aug_params = aug_params
@@ -13,36 +12,17 @@ class Augmentor:
         self.scale_prob = 0
 
         if self.aug_params.color_jitter:
-            # self.color_jitter = ColorJitter(brightness=list(aug_params.color_jitter.brightness), contrast=list(aug_params.color_jitter.contrast), saturation=list(aug_params.color_jitter.saturation), hue=aug_params.color_jitter.hue / 3.14)
-            self.color_jitter = A.Compose([
-                A.RGBShift(p=0.5),
-                A.ChannelDropout(p=0.1),
-                A.Equalize(p=0.1),
-                A.HueSaturationValue(p=0.5),
-                A.ChannelShuffle(p=0.2),
-                A.RandomBrightnessContrast(p=1),
-                A.RandomGamma(p=0.1), 
-                A.MotionBlur(p=0.1),
-                A.Blur(p=0.2),
-                A.ToGray(p=0.1),
-                A.MedianBlur(p=0.1),
-                A.ImageCompression(p=0.1),
-                A.GaussNoise(p=0.1),
-                A.GaussianBlur(p=0.1),
-                A.CLAHE(p=0.1),
-            ], p=1)
+            self.color_jitter = ColorJitter(brightness=list(aug_params.color_jitter.brightness), contrast=list(aug_params.color_jitter.contrast), saturation=list(aug_params.color_jitter.saturation), hue=aug_params.color_jitter.hue / 3.14)
 
         if self.aug_params.random_scale:
             self.scale_prob = self.aug_params.random_scale.scale_prob
 
     def color_transform(self, *images):
         if np.random.rand() < self.aug_params.color_jitter.asymmetric_prob:
-            # images = [np.array(self.color_jitter(Image.fromarray(img.astype(np.uint8))), dtype=np.float32) for img in images]
-            images = [self.color_jitter(image=img)['image'].astype(np.float32) for img in images]
+            images = [np.array(self.color_jitter(Image.fromarray(img.astype(np.uint8))), dtype=np.float32) for img in images]
         else:
             image_stack = np.concatenate(images, axis=0).astype(np.uint8)
-            # image_stack = np.array(self.color_jitter(Image.fromarray(image_stack)), dtype=np.float32)
-            image_stack = self.color_jitter(image=image_stack)['image'].astype(np.float32)
+            image_stack = np.array(self.color_jitter(Image.fromarray(image_stack)), dtype=np.float32)
             images = np.split(image_stack, len(images), axis=0)
 
         return images
@@ -118,23 +98,6 @@ class Augmentor:
             else:
                 images['disp'] = cv2.resize(images['disp'], None, fx=scale_x, fy=scale_y, interpolation=cv2.INTER_LINEAR) * scale_x
                 images['valid'] = cv2.resize(images['valid'], None, fx=scale_x, fy=scale_y, interpolation=cv2.INTER_NEAREST)
-
-                images['disp_right'] = cv2.resize(images['disp_right'], None, fx=scale_x, fy=scale_y, interpolation=cv2.INTER_LINEAR) * scale_x
-                images['valid_right'] = cv2.resize(images['valid_right'], None, fx=scale_x, fy=scale_y, interpolation=cv2.INTER_NEAREST)
-
-        if np.random.rand() < 0.1:
-            temp = images['left'][:, ::-1]
-            images['left'] = images['right'][:, ::-1]
-            images['right'] = temp
-            images['disp'] = images['disp_right'][:, ::-1]
-            images['valid'] = images['valid_right'][:, ::-1]
-
-        if np.random.rand() < 0.1:
-            images['left'] = np.flip(images['left'], axis=0)
-            images['right'] = np.flip(images['right'], axis=0)
-            images['disp'] = np.flip(images['disp'], axis=0)
-            images['valid'] = np.flip(images['valid'], axis=0)
-
 
         if (not self.sparse) and self.aug_params.y_jitter:
             max_jitter = (images['left'].shape[0] - self.aug_params.crop_size[0]) // 2

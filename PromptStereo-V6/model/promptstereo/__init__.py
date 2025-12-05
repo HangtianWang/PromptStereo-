@@ -1,1 +1,1 @@
-from .promptstereo import PromptStereo 
+from .promptstereoV0 import PromptStereoV0

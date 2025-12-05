@@ -1,1 +1,9 @@
+PromptStereo-V6/dataset/__pycache__/
+PromptStereo-V6/model/__pycache__/
+PromptStereo-V6/model/promptstereo/__pycache__/
+PromptStereo-V6/util/__pycache__/
+PromptStereo-V6/model/depth_anything_v2/__pycache__/
+PromptStereo-V6/model/depth_anything_v2/dinov2_layers/__pycache__/
+PromptStereo-V6/model/depth_anything_v2/util/__pycache__/
 PromptStereo-V6/wandb/
+PromptStereo-V6/outputs/

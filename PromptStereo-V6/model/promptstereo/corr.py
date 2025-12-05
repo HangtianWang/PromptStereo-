@@ -71,5 +71,4 @@ class CombinedGeometryEncodingVolume:
             pyramid.append(apc_volume)
 
         return torch.cat(pyramid, dim=1)
-
-
+    

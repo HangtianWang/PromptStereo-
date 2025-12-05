@@ -40,7 +40,11 @@ def main(cfg):
     should_keep_training = True
     while should_keep_training:
         model.train()
-        model.module.freeze_bn()
+        if hasattr(model,'module'):
+            model.module.freeze_bn()
+        else:
+            model.freeze_bn()
+
         for data in tqdm(train_loader, dynamic_ncols=True, disable=not accelerator.is_main_process):
             left, right, disp_gt, valid = [x for x in data]
 
@@ -92,7 +96,11 @@ def main(cfg):
                     accelerator.log({f'valid/{name}/EPE': total_epe / total_elem, f'valid/{name}/BP-{cfg.valid_set[name].outlier}': 100 * total_out / total_elem}, step)
 
                 model.train()
-                model.module.freeze_bn()
+                
+                if hasattr(model, 'module'):
+                    model.module.freeze_bn()
+                else:
+                    model.freeze_bn()
 
             if step == cfg.scheduler.total_steps:
                 should_keep_training = False

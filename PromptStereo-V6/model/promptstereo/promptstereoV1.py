@@ -8,9 +8,9 @@ from .extractor import FeatureExtractor
 from .module import *
 from util.util import *
 
-class PromptStereo(nn.Module):
+class PromptStereoV1(nn.Module):
     def __init__(self, cfg):
-        super(PromptStereo, self).__init__()
+        super(PromptStereoV1, self).__init__()
         self.cfg = cfg
 
         vit = cfg.pretrained_model.instance
@@ -185,7 +185,6 @@ class PromptStereo(nn.Module):
         return init_disp, disp_pred
     
 
-# ...existing code...
 if __name__ == '__main__':
     import os
     import hydra
