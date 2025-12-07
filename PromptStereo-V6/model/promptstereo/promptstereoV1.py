@@ -128,7 +128,7 @@ class PromptStereoV1(nn.Module):
         # 单双目视差融合成迭代起点的初始视差+Structure Prompt的要求输入
         # depth [B,1,H/4,W/4], init_disp [B,1,H/4,W/4]
         conf = self.conf(torch.cat((ctx_left[0], warped_ctx_right[0]), dim=1))
-        # norm_depth, _, _ = normalize_disparity(depth)
+        norm_depth, _, _ = normalize_disparity(depth)
         # _, scale, shift = normalize_disparity(init_disp)
         # aligned_depth = norm_depth * scale[..., None, None] + shift[..., None, None]
         scale, shift = compute_scale_shift(depth.clone().squeeze(1).to(torch.float32), init_disp.clone().squeeze(1).to(torch.float32))

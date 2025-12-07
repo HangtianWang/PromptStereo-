@@ -143,6 +143,9 @@ def compute_scale_shift(monocular_depth, gt_depth, mask=None):
     # 使用最小二乘法计算 [scale, shift]
     A = torch.matmul(X.t(), X) + 1e-6 * torch.eye(2, device=X.device)
     b = torch.matmul(X.t(), y)
+    A = A.to(torch.float32)
+    b = b.to(torch.float32)
+    
     params = torch.linalg.solve(A, b)
     
     scale, shift = params[0].item(), params[1].item()
