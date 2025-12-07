@@ -1,7 +1,0 @@
-[2025-11-21 15:00:12,432][__main__][INFO] - Reading 200 samples from KITTI.
-[2025-11-21 15:00:12,781][dinov2][INFO] - using MLP layer as FFN
-[2025-11-21 15:00:12,786][dinov2][INFO] - using MLP layer as FFN
-[2025-11-21 15:00:12,789][dinov2][INFO] - using MLP layer as FFN
-[2025-11-21 15:00:12,799][dinov2][INFO] - using MLP layer as FFN
-[2025-11-21 15:00:18,986][__main__][INFO] - Loading model from PromptStereo.
-[2025-11-21 15:00:19,713][__main__][INFO] - Loading checkpoint from /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/final/model.safetensors.

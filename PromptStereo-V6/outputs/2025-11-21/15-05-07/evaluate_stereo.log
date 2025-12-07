@@ -1,7 +1,0 @@
-[2025-11-21 15:05:09,707][__main__][INFO] - Reading 15 samples from Middlebury.
-[2025-11-21 15:05:10,041][dinov2][INFO] - using MLP layer as FFN
-[2025-11-21 15:05:10,060][dinov2][INFO] - using MLP layer as FFN
-[2025-11-21 15:05:10,062][dinov2][INFO] - using MLP layer as FFN
-[2025-11-21 15:05:10,071][dinov2][INFO] - using MLP layer as FFN
-[2025-11-21 15:05:15,622][__main__][INFO] - Loading model from PromptStereo.
-[2025-11-21 15:05:16,354][__main__][INFO] - Loading checkpoint from /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/final/model.safetensors.

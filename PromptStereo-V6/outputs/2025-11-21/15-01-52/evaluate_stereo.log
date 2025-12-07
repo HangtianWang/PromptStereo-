@@ -1,7 +1,0 @@
-[2025-11-21 15:01:55,266][__main__][INFO] - Reading 27 samples from ETH3D.
-[2025-11-21 15:01:55,551][dinov2][INFO] - using MLP layer as FFN
-[2025-11-21 15:01:55,580][dinov2][INFO] - using MLP layer as FFN
-[2025-11-21 15:01:55,611][dinov2][INFO] - using MLP layer as FFN
-[2025-11-21 15:01:55,632][dinov2][INFO] - using MLP layer as FFN
-[2025-11-21 15:02:02,128][__main__][INFO] - Loading model from PromptStereo.
-[2025-11-21 15:02:02,848][__main__][INFO] - Loading checkpoint from /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/final/model.safetensors.

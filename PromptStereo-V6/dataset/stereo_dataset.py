@@ -38,7 +38,7 @@ class StereoDataset(torch.utils.data.Dataset):
         return left, right, disp, valid
 
 class SceneFlow(StereoDataset):
-    def __init__(self, aug_params=None, root='/data/StereoDatasets/sceneflow', dstype='frames_finalpass', things_test=False, mask='all'):
+    def __init__(self, aug_params=None, root='/data/StereoData/sceneflow', dstype='frames_finalpass', things_test=False, mask='all'):
         super(SceneFlow, self).__init__(sparse=False, aug_params=aug_params, reader=sceneflow_disp_reader, mask=mask)
         assert os.path.exists(root)
         self.root = root
@@ -85,7 +85,7 @@ class SceneFlow(StereoDataset):
             self.disp_list += [disp]
 
 class KITTI(StereoDataset):
-    def __init__(self, aug_params=None, root='data/StereoDatasets/kitti', year='2015', split='training', mask='all'):
+    def __init__(self, aug_params=None, root='data/StereoData/kitti', year='2015', split='training', mask='all'):
         super(KITTI, self).__init__(sparse=True, aug_params=aug_params, reader=kitti_disp_reader, mask=mask)
         assert os.path.exists(root)
 
@@ -106,7 +106,7 @@ class KITTI(StereoDataset):
             self.disp_list += [disp]
 
 class Middlebury(StereoDataset):
-    def __init__(self, aug_params=None, root='/data/StereoDatasets/middlebury', year='MiddEval3', split='training', resolution='H', mask='noc'):
+    def __init__(self, aug_params=None, root='/data/StereoData/middlebury', year='MiddEval3', split='training', resolution='H', mask='noc'):
         super(Middlebury, self).__init__(sparse=True, aug_params=aug_params, reader=middlebury_disp_reader, mask=mask)
         assert os.path.exists(root)
 
@@ -126,7 +126,7 @@ class Middlebury(StereoDataset):
             self.disp_list += [disp]
 
 class ETH3D(StereoDataset):
-    def __init__(self, aug_params=None, root='/data/StereoDatasets/eth3d', split='training', mask='noc'):
+    def __init__(self, aug_params=None, root='/data/StereoData/eth3d', split='training', mask='noc'):
         super(ETH3D, self).__init__(sparse=True, aug_params=aug_params, reader=eth3d_disp_reader, mask=mask)
         assert os.path.exists(root)
 

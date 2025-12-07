@@ -1,7 +1,0 @@
-[2025-11-02 19:52:25,578][__main__][INFO] - Reading 35454 samples from SceneFlow.
-[2025-11-02 19:52:28,349][__main__][INFO] - Reading 4370 samples from SceneFlow.
-[2025-11-02 19:52:28,401][__main__][INFO] - Reading 200 samples from KITTI.
-[2025-11-02 19:52:28,425][__main__][INFO] - Reading 15 samples from Middlebury.
-[2025-11-02 19:52:28,436][__main__][INFO] - Reading 27 samples from ETH3D.
-[2025-11-02 19:52:28,829][dinov2][INFO] - using MLP layer as FFN
-[2025-11-02 19:52:28,856][dinov2][INFO] - using MLP layer as FFN
