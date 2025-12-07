@@ -1,3 +1,4 @@
+# 修改单目视差对齐方式为最小二乘法
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -63,8 +64,6 @@ class PromptStereoV1(nn.Module):
             nn.Sigmoid()
         )
 
-        self.disp_att = DisparityAtt(self.cfg.gwc_max_disp // (2 ** self.cfg.n_downsample))
-
     def freeze_bn(self):
         for m in self.modules():
             if isinstance(m, nn.BatchNorm2d):
@@ -87,57 +86,39 @@ class PromptStereoV1(nn.Module):
 
     def forward(self, left, right, iters=16, test_mode=False):
         B, _, H, W = left.shape
-        # stem是原图尺寸[B,C,H,W]，后一个经过放缩14/16，尺寸为[B,C,Hs,Ws]
         stem_left, left = normalize_image(left)
         stem_right, right = normalize_image(right)
-        # 假设cfg.feat_dim为 [D0, D1, D2, D3]
-        # 单目深度图 [B, 1, H/4, W/4]
+
         feat_mono, feat_stereo, depth = self.fnet(torch.cat((left, right), dim=0))
-        # 单目特征图只取左侧
-        # 单目特征组 [B,D3, H/4, W/4] [B, D3, H/8, W/8] [B, D3, H/16, W/16] [B, D3, H/32, W/32]
         ctx_mono = feat_mono[:B]
-        # 拆分双目左右特征图
-        # 左右形状都为 [B, D0, H/4, W/4] [B, D1, H/8, W/8] [B, D2, H/16, W/16] [B, D3, H/32, W/32]
         feat_left = [stereo[:B] for stereo in feat_stereo]
         feat_right = [stereo[B:] for stereo in feat_stereo]
-        # 可学习的特特征图提取分支,假设stem_dim为[S1,S2,S3,S4,S5]
-        # [2B,S1,H/2,W/2], [2B,S2,H/4,W/4], [2B,S3,H/8,W/8], [2B,S4,H/16,W/16], [2B,S5,H/32,W/32]
+
         stem_list = []
         for i, block in enumerate(self.stem):
             if i >= 1:
                 stem_list.append(block(stem_list[-1]))
             else:
                 stem_list.append(block(torch.cat((stem_left, stem_right), dim=0)))
-        # 融合预训练分支和可学习分支提取的特征，四分之一分辨率，输出为[B, D0, H/4, W/4]
+
         match_left = self.desc(torch.cat((feat_left[0], stem_list[1][:B]), dim=1))
         match_right = self.desc(torch.cat((feat_right[0], stem_list[1][B:]), dim=1))
-        # 构建代价体，代价体聚合，初始视差回归
-        # [B,G,maxdisp//4,H/4,W/4]
-        gwc_volume = build_gwc_volume(match_left, match_right, self.cfg.gwc_max_disp // (2 ** self.cfg.n_downsample), self.cfg.gwc_group)
-        # [B,G,maxdisp//4,H/4,W/4]
+
+        gwc_volume = build_gwc_volume(match_left, match_right, self.cfg.gwc_max_disp // (self.cfg.n_downsample ** 2), self.cfg.gwc_group)
         geometry_encoding_volume = self.hourglass(gwc_volume, feat_left)
-        # [B,maxdisp//4,H/4,W/4]
         prob = F.softmax(self.classifier(geometry_encoding_volume).squeeze(1), dim=1)
-        # [B,1,H/4,W/4]
-        init_disp = disparity_regression(prob, self.cfg.gwc_max_disp // (2 ** self.cfg.n_downsample))
+        init_disp = disparity_regression(prob, self.cfg.gwc_max_disp // (self.cfg.n_downsample ** 2))
 
         del gwc_volume, prob
 
-        # 指导初始视差上采样的准备
         if not test_mode:
-            # [B, S1, H/4, W/4]
             xspx = self.spx_4(match_left)
-            # [B, 2*S0, H/2, W/2]
             xspx = self.spx_2(xspx, stem_list[0][:B])
-            # [B, 9, H/4, W/4]
             spx_pred = self.spx(xspx)
-            # [B, 9, H/4, W/4]
             spx_pred = F.softmax(spx_pred, 1)
-        
-        # Motion Prompt要求的输入之一
-        # 输入形状为[B, D0, H/4, W/4] [B, D0, H/4, W/4] [B,G,maxdisp//4,H/4,W/4] 2 4
+
         corr_block = CombinedGeometryEncodingVolume(match_left, match_right, geometry_encoding_volume, self.cfg.corr_level, self.cfg.corr_radius)
-        # 融合预训练视觉大模型和可学习CNN提取的双目特征
+
         ctx_stereo = [block(torch.cat((x, y), dim=1)) for block, x, y in zip(self.cnet, feat_stereo, stem_list[1:])]
         ctx_left = [stereo[:B] for stereo in ctx_stereo]
         ctx_right = [stereo[B:] for stereo in ctx_stereo]
@@ -152,20 +133,11 @@ class PromptStereoV1(nn.Module):
         # aligned_depth = norm_depth * scale[..., None, None] + shift[..., None, None]
         scale, shift = compute_scale_shift(depth.clone().squeeze(1).to(torch.float32), init_disp.clone().squeeze(1).to(torch.float32))
         aligned_depth = scale * depth + shift
-
-        # 利用对齐后的单目视差图沿视差维度增强代价体，获得新的初始视差
-        geometry_encoding_volume = self.disp_att(geometry_encoding_volume, aligned_depth)
-        # Init disp from geometry encoding volume [B,maxdisp//4,H/4,W/4]
-        prob = F.softmax(self.classifier(geometry_encoding_volume).squeeze(1), dim=1)
-        # [B,1,H/4,W/4]
-        init_disp = disparity_regression(prob, self.cfg.gwc_max_disp // (2 ** self.cfg.n_downsample))
-
         disp = conf * init_disp + (1 - conf) * aligned_depth
 
         disp_pred = []
         for itr in range(iters):
             disp = disp.detach()
-            # corr形状为[B,C_out,H/4,W/4]，C_out=(2r+1)*(G+1)*level
             corr = corr_block(disp)
             net, delta_disp, mask = self.update_block(net, corr, disp, ctx_mono, norm_depth)
             disp = disp + delta_disp
@@ -183,50 +155,3 @@ class PromptStereoV1(nn.Module):
         init_disp = context_upsample(init_disp * 4, spx_pred, factor)
 
         return init_disp, disp_pred
-    
-
-if __name__ == '__main__':
-    import os
-    import hydra
-    from omegaconf import OmegaConf
-    import types
-
-    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    config_path = os.path.join(project_root, 'config', 'model', 'promptstereo.yaml')
-    
-    print(f"Loading config from: {config_path}")
-    full_cfg = OmegaConf.load(config_path)
-
-    OmegaConf.resolve(full_cfg)
-    cfg_omegaconf = full_cfg.instance.cfg
-
-    def dict_to_namespace(d):
-        x = types.SimpleNamespace()
-        for k, v in d.items():
-            if isinstance(v, dict):
-                setattr(x, k, dict_to_namespace(v))
-            else:
-                setattr(x, k, v)
-        return x
-
-    cfg_dict = OmegaConf.to_container(cfg_omegaconf, resolve=True)
-    cfg = dict_to_namespace(cfg_dict)
-
-    print(f"Instantiating pretrained model: {cfg.pretrained_model.name}")
-    instance_config = cfg_omegaconf.pretrained_model.instance
-    model_instance = hydra.utils.instantiate(instance_config)
-    cfg.pretrained_model.instance = model_instance
-
-    print("Initializing PromptStereo...")
-    model = PromptStereo(cfg).cuda().eval()
-
-    H, W = 448, 896
-    left = torch.randn(1, 3, H, W).cuda()
-    right = torch.randn(1, 3, H, W).cuda()
-
-    print(f"Running forward pass with input shape: {left.shape}")
-    with torch.no_grad():
-        init_disp, disp_preds = model(left, right, iters=2, test_mode=False)
-
-    print(f"Init Disp Shape: {init_disp.shape}")
-    print(f"Final Disp Shape: {disp_preds[-1].shape}")
