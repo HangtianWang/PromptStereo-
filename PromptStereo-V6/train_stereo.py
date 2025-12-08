@@ -68,6 +68,8 @@ def main(cfg):
                 accelerator.save_state(os.path.join(cfg.save_path, str(step)))
 
             if (step > 0) and (step % cfg.valid_freq == 0):
+                # 清理训练时候产生的显存碎片
+                torch.cuda.empty_cache()
                 for name in valid_loader:
                     model.eval()
                     total_elem, total_epe, total_out = 0, 0, 0
@@ -77,7 +79,9 @@ def main(cfg):
                         left, right = padder.pad(left, right)
 
                         with torch.no_grad():
-                            disp_pred = model(left, right, iters=cfg.model.valid_iters, test_mode=True)
+                            # 验证时也开启混合精度
+                            with accelerator.autocast():
+                                disp_pred = model(left, right, iters=cfg.model.valid_iters, test_mode=True)
                             disp_pred = padder.unpad(disp_pred)
                             
                         epe = torch.abs(disp_pred - disp_gt)
