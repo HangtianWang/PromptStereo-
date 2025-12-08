@@ -17,7 +17,9 @@ def main(cfg):
     set_seed(cfg.seed)
     logger = get_logger(__name__)
     gpu_num = len(cfg.gpus.split(','))
-    accelerator = instantiate(cfg.accelerator, _partial_=True)(kwargs_handlers=[DistributedDataParallelKwargs(find_unused_parameters=True)])
+    accelerator = instantiate(cfg.accelerator, _partial_=True)(
+        gradient_accumulation_steps=cfg.accelerator.gradient_accumulation_steps,
+        kwargs_handlers=[DistributedDataParallelKwargs(find_unused_parameters=True)])
     accelerator.init_trackers(project_name=cfg.tracker.project_name, config=OmegaConf.to_container(cfg, resolve=True), init_kwargs=cfg.tracker.init_kwargs)
 
     train_loader = fetch_dataloader(cfg, cfg.train_set, cfg.train_loader, logger)
@@ -47,66 +49,68 @@ def main(cfg):
 
         for data in tqdm(train_loader, dynamic_ncols=True, disable=not accelerator.is_main_process):
             left, right, disp_gt, valid = [x for x in data]
+            with accelerator.accumulate(model):
+                with accelerator.autocast():
+                    init_disp, disp_pred = model(left, right, iters=cfg.model.train_iters)
 
-            with accelerator.autocast():
-                init_disp, disp_pred = model(left, right, iters=cfg.model.train_iters)
+                loss, metric = sequence_loss(init_disp, disp_pred, disp_gt, valid, cfg.max_disp)
+                accelerator.backward(loss)
+                if accelerator.sync_gradients:
+                    accelerator.clip_grad_norm_(model.parameters(), cfg.max_norm)
+                optimizer.step()
+                scheduler.step()
+                optimizer.zero_grad()
 
-            loss, metric = sequence_loss(init_disp, disp_pred, disp_gt, valid, cfg.max_disp)
-            accelerator.backward(loss)
-            accelerator.clip_grad_norm_(model.parameters(), cfg.max_norm)
-            optimizer.step()
-            scheduler.step()
-            optimizer.zero_grad()
+            if accelerator.sync_gradients:
+                step += 1
+                loss = accelerator.reduce(loss.detach(), reduction='mean')
+                metric = accelerator.reduce(metric, reduction='mean')
+                accelerator.log({'train/loss': loss, 'train/learning_rate': optimizer.param_groups[0]['lr']}, step)
+                accelerator.log(metric, step)
 
-            step += 1
-            loss = accelerator.reduce(loss.detach(), reduction='mean')
-            metric = accelerator.reduce(metric, reduction='mean')
-            accelerator.log({'train/loss': loss, 'train/learning_rate': optimizer.param_groups[0]['lr']}, step)
-            accelerator.log(metric, step)
+                if (step > 0) and (step % cfg.save_freq == 0):
+                    accelerator.save_state(os.path.join(cfg.save_path, str(step)))
 
-            if (step > 0) and (step % cfg.save_freq == 0):
-                accelerator.save_state(os.path.join(cfg.save_path, str(step)))
+                if (step > 0) and (step % cfg.valid_freq == 0):
+                    # 清理训练时候产生的显存碎片
+                    torch.cuda.empty_cache()
+                    for name in valid_loader:
+                        model.eval()
+                        total_elem, total_epe, total_out = 0, 0, 0
+                        for data in tqdm(valid_loader[name], dynamic_ncols=True, disable=not accelerator.is_main_process):
+                            left, right, disp_gt, valid = [x for x in data]
+                            padder = InputPadder(left.shape, divis_by=32)
+                            left, right = padder.pad(left, right)
 
-            if (step > 0) and (step % cfg.valid_freq == 0):
-                # 清理训练时候产生的显存碎片
-                torch.cuda.empty_cache()
-                for name in valid_loader:
-                    model.eval()
-                    total_elem, total_epe, total_out = 0, 0, 0
-                    for data in tqdm(valid_loader[name], dynamic_ncols=True, disable=not accelerator.is_main_process):
-                        left, right, disp_gt, valid = [x for x in data]
-                        padder = InputPadder(left.shape, divis_by=32)
-                        left, right = padder.pad(left, right)
+                            with torch.no_grad():
+                                # 验证时也开启混合精度
+                                with accelerator.autocast():
+                                    disp_pred = model(left, right, iters=cfg.model.valid_iters, test_mode=True)
+                                disp_pred = padder.unpad(disp_pred)
+                                
+                            epe = torch.abs(disp_pred - disp_gt)
+                            out = (epe > cfg.valid_set[name].outlier).float()
 
-                        with torch.no_grad():
-                            # 验证时也开启混合精度
-                            with accelerator.autocast():
-                                disp_pred = model(left, right, iters=cfg.model.valid_iters, test_mode=True)
-                            disp_pred = padder.unpad(disp_pred)
-                            
-                        epe = torch.abs(disp_pred - disp_gt)
-                        out = (epe > cfg.valid_set[name].outlier).float()
+                            if cfg.max_disp:
+                                valid = (valid >= 0.5) & (disp_gt < cfg.max_disp)
+                            else:
+                                valid = (valid >= 0.5)
 
-                        if cfg.max_disp:
-                            valid = (valid >= 0.5) & (disp_gt < cfg.max_disp)
-                        else:
-                            valid = (valid >= 0.5)
+                            epe, out = accelerator.gather_for_metrics((torch.nan_to_num(epe[valid >= 0.5].mean()), torch.nan_to_num(out[valid >= 0.5].mean())))
 
-                        epe, out = accelerator.gather_for_metrics((torch.nan_to_num(epe[valid >= 0.5].mean()), torch.nan_to_num(out[valid >= 0.5].mean())))
+                            total_elem += epe.shape[0]
+                            total_epe += epe.sum().item()
+                            total_out += out.sum().item()
+                        accelerator.log({f'valid/{name}/EPE': total_epe / total_elem, f'valid/{name}/BP-{cfg.valid_set[name].outlier}': 100 * total_out / total_elem}, step)
 
-                        total_elem += epe.shape[0]
-                        total_epe += epe.sum().item()
-                        total_out += out.sum().item()
-                    accelerator.log({f'valid/{name}/EPE': total_epe / total_elem, f'valid/{name}/BP-{cfg.valid_set[name].outlier}': 100 * total_out / total_elem}, step)
+                    model.train()
+                    
+                    if hasattr(model, 'module'):
+                        model.module.freeze_bn()
+                    else:
+                        model.freeze_bn()
 
-                model.train()
-                
-                if hasattr(model, 'module'):
-                    model.module.freeze_bn()
-                else:
-                    model.freeze_bn()
-
-            if step == cfg.scheduler.total_steps:
+            if step >= cfg.scheduler.total_steps:
                 should_keep_training = False
                 break
 
