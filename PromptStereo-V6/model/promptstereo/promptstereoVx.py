@@ -1,3 +1,5 @@
+# 1.利用对齐的单目初始视差对代价体的视差维度做强化
+# 2.增加从代价体中回归的熵值用于优化融合置信度
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -60,6 +62,10 @@ class PromptStereoVx(nn.Module):
         self.conf = nn.Sequential(
             BasicConv(cfg.pretrained_model.features * 2, cfg.pretrained_model.features * 2, kernel_size=3, stride=1, padding=1),
             nn.Conv2d(cfg.pretrained_model.features * 2, 1, 1, 1, 0),
+            nn.Sigmoid()
+        )
+        self.conf2 = nn.Sequential(
+            nn.Conv2d(2, 1, 1, 1, 0),
             nn.Sigmoid()
         )
 
@@ -145,9 +151,8 @@ class PromptStereoVx(nn.Module):
         net = [block(torch.cat((x, y), dim=1)) for block, x, y in zip(self.hnet, ctx_left, warped_ctx_right)]
 
         # 单双目视差融合成迭代起点的初始视差+Structure Prompt的要求输入
-        # depth [B,1,H/4,W/4], init_disp [B,1,H/4,W/4]
-        conf = self.conf(torch.cat((ctx_left[0], warped_ctx_right[0]), dim=1))
-        # norm_depth, _, _ = normalize_disparity(depth)
+
+        norm_depth, _, _ = normalize_disparity(depth)
         # _, scale, shift = normalize_disparity(init_disp)
         # aligned_depth = norm_depth * scale[..., None, None] + shift[..., None, None]
         scale, shift = compute_scale_shift(depth.clone().squeeze(1).to(torch.float32), init_disp.clone().squeeze(1).to(torch.float32))
@@ -159,6 +164,14 @@ class PromptStereoVx(nn.Module):
         prob = F.softmax(self.classifier(geometry_encoding_volume).squeeze(1), dim=1)
         # [B,1,H/4,W/4]
         init_disp = disparity_regression(prob, self.cfg.gwc_max_disp // (2 ** self.cfg.n_downsample))
+
+        # 获得融合置信度conf
+        # 计算熵值[B, 1, H, W]
+        entropy = calculate_disparity_entropy(geometry_encoding_volume)
+        # depth [B,1,H/4,W/4], init_disp [B,1,H/4,W/4]
+        conf = self.conf(torch.cat((ctx_left[0], warped_ctx_right[0]), dim=1))
+        # 融合熵和置信度1得到最终置信度
+        conf = self.conf2(torch.cat((conf, entropy), dim=1))
 
         disp = conf * init_disp + (1 - conf) * aligned_depth
 
@@ -218,7 +231,7 @@ if __name__ == '__main__':
     cfg.pretrained_model.instance = model_instance
 
     print("Initializing PromptStereo...")
-    model = PromptStereo(cfg).cuda().eval()
+    model = PromptStereoVx(cfg).cuda().eval()
 
     H, W = 448, 896
     left = torch.randn(1, 3, H, W).cuda()

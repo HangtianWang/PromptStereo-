@@ -1,6 +1,7 @@
 import torch
 import torchvision
 import torch.nn.functional as F
+import math
 
 def freeze_module(module):
     module.eval()
@@ -151,3 +152,26 @@ def compute_scale_shift(monocular_depth, gt_depth, mask=None):
     scale, shift = params[0].item(), params[1].item()
     
     return scale, shift
+
+
+def calculate_disparity_entropy(cost_volume, keep_norm=True):
+
+    B, G, D, H, W = cost_volume.shape
+    
+    #聚合 Group 维度
+    #[B, D, H, W]
+    volume_aggregated = torch.mean(cost_volume, dim=1)
+    
+    #计算概率分布
+    prob_volume = F.softmax(volume_aggregated, dim=1) # [B, D, H, W]
+    
+    #计算信息熵
+    # H(x) = -sum(p(x) * log2(p(x)))
+    entropy = -torch.sum(prob_volume * torch.log2(prob_volume + 1e-6), dim=1) # [B, H, W]
+    
+    
+    if keep_norm:
+        entropy = entropy / math.log2(D)
+        
+    
+    return entropy.unsqueeze(1)

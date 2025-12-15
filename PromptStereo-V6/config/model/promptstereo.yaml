@@ -2,7 +2,7 @@ name: PromptStereo
 train_iters: 16
 valid_iters: 32
 instance:
-  _target_: model.promptstereo.PromptStereoV1
+  _target_: model.promptstereo.PromptStereoV0
   cfg:
     feat_dim: [64, 128, 192, 256]
     stem_dim: [32, 64, 128, 192, 256]
