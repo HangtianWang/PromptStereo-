@@ -41,6 +41,21 @@ def build_gwc_volume(left, right, max_disp, group):
 
     return volume
 
+def build_concat_volume(refimg_fea, targetimg_fea, maxdisp):
+    B, C, H, W = refimg_fea.shape
+    
+    volume = refimg_fea.new_zeros([B, 2 * C, maxdisp, H, W])
+    for i in range(maxdisp):
+        if i > 0:
+            volume[:, :C, i, :, :] = refimg_fea[:, :, :, :]
+            volume[:, C:, i, :, i:] = targetimg_fea[:, :, :, :-i]
+        else:
+            volume[:, :C, i, :, :] = refimg_fea
+            volume[:, C:, i, :, :] = targetimg_fea
+    volume = volume.contiguous()
+
+    return volume
+
 def disparity_regression(x, max_disp):
     disp_value = torch.arange(0, max_disp, dtype=x.dtype, device=x.device)
     disp_value = disp_value.view(1, max_disp, 1, 1)

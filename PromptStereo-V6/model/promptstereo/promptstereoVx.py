@@ -1,5 +1,6 @@
 # 1.利用对齐的单目初始视差对代价体的视差维度做强化
 # 2.增加从代价体中回归的熵值用于优化融合置信度
+# 3.代价体采用concat_volume+corr_volume
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -120,14 +121,18 @@ class PromptStereoVx(nn.Module):
         # 构建代价体，代价体聚合，初始视差回归
         # [B,G,maxdisp//4,H/4,W/4]
         gwc_volume = build_gwc_volume(match_left, match_right, self.cfg.gwc_max_disp // (2 ** self.cfg.n_downsample), self.cfg.gwc_group)
+        # [B,2*D0,maxdisp//4,H/4,W/4]
+        concat_volume = build_concat_volume(match_left, match_right, self.cfg.gwc_max_disp // (2 ** self.cfg.n_downsample))
+        # [B,2*D0+G,maxdisp//4,H/4,W/4]
+        comb_volume = torch.cat([gwc_volume, concat_volume], dim=1)
         # [B,G,maxdisp//4,H/4,W/4]
-        geometry_encoding_volume = self.hourglass(gwc_volume, feat_left)
+        geometry_encoding_volume = self.hourglass(comb_volume, feat_left)
         # [B,maxdisp//4,H/4,W/4]
         prob = F.softmax(self.classifier(geometry_encoding_volume).squeeze(1), dim=1)
         # [B,1,H/4,W/4]
         init_disp = disparity_regression(prob, self.cfg.gwc_max_disp // (2 ** self.cfg.n_downsample))
 
-        del gwc_volume, prob
+        del gwc_volume, concat_volume, comb_volume, prob
 
         # 指导初始视差上采样的准备
         if not test_mode:
@@ -151,7 +156,6 @@ class PromptStereoVx(nn.Module):
         net = [block(torch.cat((x, y), dim=1)) for block, x, y in zip(self.hnet, ctx_left, warped_ctx_right)]
 
         # 单双目视差融合成迭代起点的初始视差+Structure Prompt的要求输入
-
         norm_depth, _, _ = normalize_disparity(depth)
         # _, scale, shift = normalize_disparity(init_disp)
         # aligned_depth = norm_depth * scale[..., None, None] + shift[..., None, None]
@@ -165,6 +169,7 @@ class PromptStereoVx(nn.Module):
         # [B,1,H/4,W/4]
         init_disp = disparity_regression(prob, self.cfg.gwc_max_disp // (2 ** self.cfg.n_downsample))
 
+        del prob
         # 获得融合置信度conf
         # 计算熵值[B, 1, H, W]
         entropy = calculate_disparity_entropy(geometry_encoding_volume)
