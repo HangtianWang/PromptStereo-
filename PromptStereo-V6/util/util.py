@@ -184,9 +184,22 @@ def calculate_disparity_entropy(cost_volume, keep_norm=True):
     # H(x) = -sum(p(x) * log2(p(x)))
     entropy = -torch.sum(prob_volume * torch.log2(prob_volume + 1e-6), dim=1) # [B, H, W]
     
-    
     if keep_norm:
         entropy = entropy / math.log2(D)
         
-    
     return entropy.unsqueeze(1)
+
+
+def get_occlusion_proxy(feat_left, warped_ctx_right):
+    # [B, C, H, W], [B, C, H, W]
+    diff = torch.abs(feat_left - warped_ctx_right)
+    # [B, 1, H, W]
+    error_map = torch.mean(diff, dim=1, keepdim=True)
+    # 归一化
+    B, C, H, W = error_map.shape
+    flat_map = error_map.view(B, C, -1)
+    # [B, C, 1] -> [B, C, 1, 1]
+    min_val = flat_map.min(dim=-1, keepdim=True)[0].view(B, C, 1, 1)
+    max_val = flat_map.max(dim=-1, keepdim=True)[0].view(B, C, 1, 1)
+    error_map = (error_map - min_val) / (max_val - min_val + 1e-6)
+    return error_map

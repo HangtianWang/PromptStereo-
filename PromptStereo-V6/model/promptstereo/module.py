@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 class BasicConv(nn.Module):
     def __init__(self, in_channel, out_channel, deconv=False, is_3d=False, norm='instance', relu='leaky', **kwargs):
@@ -219,6 +220,7 @@ class HourGlass(nn.Module):
 
         return conv
 
+    
 class DisparityAtt(nn.Module):
     def __init__(self, maxdisp, learnable_sigma=True):
         super(DisparityAtt, self).__init__()
@@ -226,22 +228,57 @@ class DisparityAtt(nn.Module):
         self.register_buffer('disp_grid', torch.arange(self.D, dtype=torch.float32).view(1, 1, self.D, 1, 1))
 
         if learnable_sigma:
-            self.sigma = nn.Parameter(torch.tensor(1.0))
+            self.sigma = nn.Parameter(torch.tensor(2.0)) 
         else:
-            self.sigma = 1.0
+            self.sigma = 2.0
+        
+        self.amplitude = nn.Parameter(torch.tensor(0.01))
 
     def forward(self, cv, pred_disp):
-        # [B, 1, 1, H/4, W/4]
+        """
+        cv: [B, G, D, H, W] Cost Volume (Logits)
+        pred_disp: [B, 1, H, W] Aligned Monocular Disparity
+        """
+        #[B, 1, 1, H, W]
         norm_disp = pred_disp.unsqueeze(2)
         
-        # dist: [B, 1, maxdisp/4, H/4, W/4] -> 每个像素点上，各个视差候选值距离预测值的距离
+        #[B, 1, D, H, W]
         dist = self.disp_grid - norm_disp
 
-        sigma = torch.clamp(torch.abs(self.sigma), min=0.1)
+        sigma = torch.clamp(torch.abs(self.sigma), min=0.5)
         
-        # 计算权重，形状为 [B, 1, maxdisp/4, H/4, W/4]
-        disp_att = torch.exp(- (dist ** 2) / (2 * sigma ** 2))
-        # cv: [B, C, maxdisp/4, H/4, W/4] * disp_att: [B, 1, maxdisp/4, H/4, W/4]
-        output = cv * disp_att
+        #高斯分布 [B, 1, D, H, W]
+        gaussian_weight = torch.exp(- (dist ** 2) / (2 * sigma ** 2))
+        output = cv + self.amplitude * gaussian_weight
         
         return output
+    
+
+class SobelEdge(nn.Module):
+    def __init__(self):
+        super(SobelEdge, self).__init__()
+        
+        self.kernel_x = torch.tensor([[-1., 0., 1.], [-2., 0., 2.], [-1., 0., 1.]]).view(1, 1, 3, 3)
+        self.kernel_y = torch.tensor([[-1., -2., -1.], [0., 0., 0.], [1., 2., 1.]]).view(1, 1, 3, 3)
+
+    def forward(self, img):
+        """
+        img: [B, 3, H, W]
+        """
+        img = F.interpolate(img, scale_factor=0.25, mode='bilinear', align_corners=True)
+        B, C, H, W = img.shape
+        if C == 3:
+            gray = 0.299 * img[:, 0:1] + 0.587 * img[:, 1:2] + 0.114 * img[:, 2:3]
+        else:
+            gray = img
+            
+        kx = self.kernel_x.to(img.device).type(img.dtype)
+        ky = self.kernel_y.to(img.device).type(img.dtype)
+
+        gx = F.conv2d(gray, kx, padding=1)
+        gy = F.conv2d(gray, ky, padding=1)
+
+        edge = torch.sqrt(gx**2 + gy**2 + 1e-6)
+        edge = edge / (edge.max().detach() + 1e-6)
+        
+        return edge # [B, 1, H/4, W/4]

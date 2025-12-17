@@ -66,11 +66,15 @@ class PromptStereoVx(nn.Module):
             nn.Sigmoid()
         )
         self.conf2 = nn.Sequential(
-            nn.Conv2d(2, 1, 1, 1, 0),
+            nn.Conv2d(4, 16, kernel_size=3, stride=1, padding=1, bias=False),
+            nn.BatchNorm2d(16),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(16, 1, kernel_size=1, stride=1, padding=0, bias=True),
             nn.Sigmoid()
         )
 
         self.disp_att = DisparityAtt(self.cfg.gwc_max_disp // (2 ** self.cfg.n_downsample))
+        self.sobel = SobelEdge()
 
     def freeze_bn(self):
         for m in self.modules():
@@ -157,10 +161,10 @@ class PromptStereoVx(nn.Module):
 
         # 单双目视差融合成迭代起点的初始视差+Structure Prompt的要求输入
         norm_depth, _, _ = normalize_disparity(depth)
-        # _, scale, shift = normalize_disparity(init_disp)
-        # aligned_depth = norm_depth * scale[..., None, None] + shift[..., None, None]
-        scale, shift = compute_scale_shift(depth.clone().squeeze(1).to(torch.float32), init_disp.clone().squeeze(1).to(torch.float32))
-        aligned_depth = scale * depth + shift
+        _, scale, shift = normalize_disparity(init_disp)
+        aligned_depth = norm_depth * scale[..., None, None] + shift[..., None, None]
+        # scale, shift = compute_scale_shift(depth.clone().squeeze(1).to(torch.float32), init_disp.clone().squeeze(1).to(torch.float32))
+        # aligned_depth = scale * depth + shift
 
         # 利用对齐后的单目视差图沿视差维度增强代价体，获得新的初始视差
         geometry_encoding_volume = self.disp_att(geometry_encoding_volume, aligned_depth)
@@ -171,13 +175,16 @@ class PromptStereoVx(nn.Module):
 
         del prob
         # 获得融合置信度conf
-        # 计算熵值[B, 1, H, W]
+        # 从代价体计算熵值[B, 1, H, W], 反应某一个像素的视差可信度
         entropy = calculate_disparity_entropy(geometry_encoding_volume)
+        # 计算左图和右图warp之后的左图的差异，显式反应遮挡关系
+        error_map = get_occlusion_proxy(ctx_left[0], warped_ctx_right[0])
+        # 计算梯度，反应边界位置，单目边界较模糊应该信赖锐利的双目边界
+        grad_map = self.sobel(stem_left)
         # depth [B,1,H/4,W/4], init_disp [B,1,H/4,W/4]
         conf = self.conf(torch.cat((ctx_left[0], warped_ctx_right[0]), dim=1))
         # 融合熵和置信度1得到最终置信度
-        conf = self.conf2(torch.cat((conf, entropy), dim=1))
-
+        conf = self.conf2(torch.cat((conf, entropy, error_map, grad_map), dim=1))
         disp = conf * init_disp + (1 - conf) * aligned_depth
 
         disp_pred = []
