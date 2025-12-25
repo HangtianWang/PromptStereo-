@@ -15,14 +15,14 @@ accelerator:
     split_batches: True
     use_seedable_sampler: True
   log_with: wandb
-  gradient_accumulation_steps: 2
+  gradient_accumulation_steps: 4
 
 tracker:
   project_name: PromptStereoPlusPlus
   init_kwargs:
     wandb:
       entity: null
-      name: exp0
+      name: exp2
 
 aug_params:
   crop_size: [384, 768]
@@ -123,11 +123,13 @@ valid_set:
 train_loader:
   split: False
   batch_size_per_gpu: null
-  total_batch_size: 4
+  total_batch_size: 2
   param:
     batch_size: null
-    num_workers: null
-    pin_memory: True
+    # num_worker2原来是null，现在改为4，避免电流峰值超限引发重启
+    num_workers: 4
+    # pin_memory改为False换取电压稳定
+    pin_memory: False
     shuffle: True
     drop_last: True
 
@@ -137,8 +139,8 @@ valid_loader:
   total_batch_size: null
   param:
     batch_size: null
-    num_workers: null
-    pin_memory: True
+    num_workers: 2
+    pin_memory: False
     shuffle: False
     drop_last: False
 
@@ -157,5 +159,5 @@ scheduler:
 max_disp: 192
 max_norm: 1.0
 save_freq: 100000
-save_path: /data/wht/checkpoints/promptstereo/exp0
+save_path: /data/wht/checkpoints/promptstereo/exp2
 valid_freq: 10000

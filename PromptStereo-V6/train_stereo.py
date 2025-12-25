@@ -1,6 +1,7 @@
 import os
 import hydra
 import torch
+import time
 from tqdm import tqdm
 from omegaconf import OmegaConf
 from hydra.utils import instantiate
@@ -113,6 +114,9 @@ def main(cfg):
             if step >= cfg.scheduler.total_steps:
                 should_keep_training = False
                 break
+
+        # 每个epoch跑完休眠半分钟，去掉积热
+        time.sleep(30)
 
     accelerator.save_model(model, os.path.join(cfg.save_path, 'final'))
 
