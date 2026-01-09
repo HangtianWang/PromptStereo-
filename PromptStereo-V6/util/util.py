@@ -203,3 +203,13 @@ def get_occlusion_proxy(feat_left, warped_ctx_right):
     max_val = flat_map.max(dim=-1, keepdim=True)[0].view(B, C, 1, 1)
     error_map = (error_map - min_val) / (max_val - min_val + 1e-6)
     return error_map
+
+def initializate_mono_depth(idepth, idepth_scale = .25):
+    # 映射为符合物理规律的初始视差范围，为scale迭代做准备
+    bs = idepth.shape[0]
+    ow = idepth.shepe[-1]
+    max_idepth, _ = torch.max(idepth.view(bs, -1), dim=1)
+    max_idepth = max_idepth.detach().view(bs, 1, 1, 1) + 1e-8
+    idepth = idepth / max_idepth * idepth_scale * ow + 0.01
+
+    return idepth

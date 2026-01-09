@@ -1,19 +1,35 @@
-# 1.利用对齐的单目初始视差对代价体的视差维度做强化
-# 2.增加从代价体中回归的熵值用于优化融合置信度
-# 3.代价体采用concat_volume+corr_volume
+# 代价体采用concat_volume+corr_volume
+# 参考DEFOM,两段迭代，完成之后，相较于defomstereo最大的改动是修改了迭代器以及检索函数、代价体？等---施工中：
+# 1. 在update中,设计增加了一个基于原来promptstereo迭代器的scale迭代模块
+# 2. 修改了迭代流程，分为两节，并且在模型forward定义中新增了一个sclae_iters的scale迭代次数参数
+# 3. 在utils中增加了一个逆深度初始化函数，用于对单目大模型推理出来的逆视差进行处理
+# 4. 还需要设计一个scale迭代流程中的corr检索函数----施工中
+# 5. 注释掉了所有不需要的模块----大致完成，需要检查
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from accelerate import load_checkpoint_and_dispatch
 from .corr import CombinedGeometryEncodingVolume
-from .update import MultiPromptUpdateBlock
+from .update import MultiPromptUpdateBlock, ScaleMultiPromptUpdateBlock
 from .extractor import FeatureExtractor
 from .module import *
 from util.util import *
 
-class PromptStereoVx(nn.Module):
+try:
+    autocast = torch.cuda.amp.autocast
+except:
+    # dummy autocast for PyTorch < 1.6
+    class autocast:
+        def __init__(self, enabled):
+            pass
+        def __enter__(self):
+            pass
+        def __exit__(self, *args):
+            pass
+
+class PromptStereoV4(nn.Module):
     def __init__(self, cfg):
-        super(PromptStereoVx, self).__init__()
+        super(PromptStereoV4, self).__init__()
         self.cfg = cfg
 
         vit = cfg.pretrained_model.instance
@@ -21,6 +37,7 @@ class PromptStereoVx(nn.Module):
 
         self.fnet = FeatureExtractor(cfg, vit.state_dict())
         self.update_block = MultiPromptUpdateBlock(cfg, vit.depth_head.state_dict())
+        self.scale_update_block = ScaleMultiPromptUpdateBlock(cfg, vit.depth_head.state_dict())
 
         del vit
 
@@ -96,14 +113,16 @@ class PromptStereoVx(nn.Module):
         
         return disp.view(B, C, factor * H, factor * W)
 
-    def forward(self, left, right, iters=16, test_mode=False):
+    def forward(self, left, right, iters=16, scale_iters=4, test_mode=False):
         B, _, H, W = left.shape
-        # stem是原图尺寸[B,C,H,W]，后一个经过放缩14/16，尺寸为[B,C,Hs,Ws]，后续经过vit编码到1/16特征图，再上采样至1/4
+        # stem是原图尺寸[B,C,H,W]，后一个经过放缩14/16，尺寸为[B,C,Hs,Ws]
         stem_left, left = normalize_image(left)
         stem_right, right = normalize_image(right)
         # 假设cfg.feat_dim为 [D0, D1, D2, D3]
         # 单目深度图 [B, 1, H/4, W/4]
-        feat_mono, feat_stereo, depth = self.fnet(torch.cat((left, right), dim=0))
+        feat_mono, feat_stereo, idepth = self.fnet(torch.cat((left, right), dim=0))
+        # 参考defom，映射为符合物理规律的初始视差范围，为scale迭代做准备
+        disp = initializate_mono_depth(idepth)
         # 单目特征图只取左侧
         # 单目特征组 [B,D3, H/4, W/4] [B, D3, H/8, W/8] [B, D3, H/16, W/16] [B, D3, H/32, W/32]
         ctx_mono = feat_mono[:B]
@@ -160,45 +179,66 @@ class PromptStereoVx(nn.Module):
         net = [block(torch.cat((x, y), dim=1)) for block, x, y in zip(self.hnet, ctx_left, warped_ctx_right)]
 
         # 单双目视差融合成迭代起点的初始视差+Structure Prompt的要求输入
-        norm_depth, _, _ = normalize_disparity(depth)
-        _, scale, shift = normalize_disparity(init_disp)
-        aligned_depth = norm_depth * scale[..., None, None] + shift[..., None, None]
+        # defom不相信双目视差的范围，所以这里的对齐也没有意义
+        norm_depth, _, _ = normalize_disparity(idepth)
+        # _, scale, shift = normalize_disparity(init_disp)
+        # aligned_depth = norm_depth * scale[..., None, None] + shift[..., None, None]
         # scale, shift = compute_scale_shift(depth.clone().squeeze(1).to(torch.float32), init_disp.clone().squeeze(1).to(torch.float32))
         # aligned_depth = scale * depth + shift
 
         # 利用对齐后的单目视差图沿视差维度增强代价体，获得新的初始视差
-        geometry_encoding_volume = self.disp_att(geometry_encoding_volume, aligned_depth)
+        # geometry_encoding_volume = self.disp_att(geometry_encoding_volume, aligned_depth)
         # Init disp from geometry encoding volume [B,maxdisp//4,H/4,W/4]
-        prob = F.softmax(self.classifier(geometry_encoding_volume).squeeze(1), dim=1)
+        # prob = F.softmax(self.classifier(geometry_encoding_volume).squeeze(1), dim=1)
         # [B,1,H/4,W/4]
-        init_disp = disparity_regression(prob, self.cfg.gwc_max_disp // (2 ** self.cfg.n_downsample))
+        # init_disp = disparity_regression(prob, self.cfg.gwc_max_disp // (2 ** self.cfg.n_downsample))
 
-        del prob
+        # del prob
         # 获得融合置信度conf
         # 从代价体计算熵值[B, 1, H, W], 反应某一个像素的视差可信度
-        entropy = calculate_disparity_entropy(geometry_encoding_volume)
+        # entropy = calculate_disparity_entropy(geometry_encoding_volume)
         # 计算左图和右图warp之后的左图的差异，显式反应遮挡关系
-        error_map = get_occlusion_proxy(ctx_left[0], warped_ctx_right[0])
+        # error_map = get_occlusion_proxy(ctx_left[0], warped_ctx_right[0])
         # 计算梯度，反应边界位置，单目边界较模糊应该信赖锐利的双目边界
-        grad_map = self.sobel(stem_left)
+        # grad_map = self.sobel(stem_left)
         # depth [B,1,H/4,W/4], init_disp [B,1,H/4,W/4]
-        conf = self.conf(torch.cat((ctx_left[0], warped_ctx_right[0]), dim=1))
+        # 因为初始视差必须以单目分支为主，所以这里的融合也没有意义
+        # conf = self.conf(torch.cat((ctx_left[0], warped_ctx_right[0]), dim=1))
         # 融合熵和置信度1得到最终置信度
-        conf = self.conf2(torch.cat((conf, entropy, error_map, grad_map), dim=1))
-        disp = conf * init_disp + (1 - conf) * aligned_depth
+        # conf = self.conf2(torch.cat((conf, entropy, error_map, grad_map), dim=1))
+        # disp = conf * init_disp + (1 - conf) * aligned_depth
 
         disp_pred = []
         for itr in range(iters):
             disp = disp.detach()
             # corr形状为[B,C_out,H/4,W/4]，C_out=(2r+1)*(G+1)*level
-            corr = corr_block(disp)
-            net, delta_disp, mask = self.update_block(net, corr, disp, ctx_mono, norm_depth)
-            disp = disp + delta_disp
+            if itr < scale_iters:
+                corr = corr_block(disp, scaling=True)  # index correlation volume
+                with autocast(enabled=self.args.mixed_precision):
+                    net, scale_disp, up_mask = self.update_block(net, corr, disp, ctx_mono, norm_depth)
+                # F(t+1) = \Scale(t) x F(t)
+                disp = scale_disp * disp
+            # 顺序做delta迭代
+            else:
+                corr = corr_block(disp, scaling=False)  # index correlation volume
+                with autocast(enabled=self.args.mixed_precision):
+                    net, delta_disp, up_mask = self.scale_update_block(net, corr, disp, ctx_mono, norm_depth)
+
+                    # To avoid unstability, we limit the disparity update within the searching range.
+                    delta_disp = torch.clip(delta_disp, min=-2**(self.args.corr_levels-1)*self.args.corr_radius,
+                                            max=2**(self.args.corr_levels-1)*self.args.corr_radius)
+
+                # F(t+1) = F(t) + \Delta(t)
+                disp = disp + delta_disp
+
+            # corr = corr_block(disp)  
+            # net, delta_disp, mask = self.update_block(net, corr, disp, ctx_mono, norm_depth)
+            # disp = disp + delta_disp
 
             if test_mode and itr < iters - 1:
                 continue
 
-            up_disp = self.upsample_disp(disp, mask)
+            up_disp = self.upsample_disp(disp, up_mask)
             disp_pred.append(up_disp)
         
         if test_mode:
@@ -243,7 +283,7 @@ if __name__ == '__main__':
     cfg.pretrained_model.instance = model_instance
 
     print("Initializing PromptStereo...")
-    model = PromptStereoVx(cfg).cuda().eval()
+    model = PromptStereoV4(cfg).cuda().eval()
 
     H, W = 448, 896
     left = torch.randn(1, 3, H, W).cuda()

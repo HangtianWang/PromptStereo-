@@ -15,7 +15,7 @@ accelerator:
     split_batches: True
     use_seedable_sampler: True
   log_with: wandb
-  gradient_accumulation_steps: 4
+  gradient_accumulation_steps: 2
 
 tracker:
   project_name: PromptStereoPlusPlus
@@ -123,13 +123,13 @@ valid_set:
 train_loader:
   split: False
   batch_size_per_gpu: null
-  total_batch_size: 2
+  total_batch_size: 4
   param:
     batch_size: null
     # num_worker2原来是null，现在改为4，避免电流峰值超限引发重启
-    num_workers: 4
+    num_workers: null
     # pin_memory改为False换取电压稳定
-    pin_memory: False
+    pin_memory: True
     shuffle: True
     drop_last: True
 
@@ -139,8 +139,8 @@ valid_loader:
   total_batch_size: null
   param:
     batch_size: null
-    num_workers: 2
-    pin_memory: False
+    num_workers: null
+    pin_memory: True
     shuffle: False
     drop_last: False
 

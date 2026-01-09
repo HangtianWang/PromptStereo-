@@ -116,7 +116,7 @@ def main(cfg):
                 break
 
         # 每个epoch跑完休眠半分钟，去掉积热
-        time.sleep(30)
+        # time.sleep(30)
 
     accelerator.save_model(model, os.path.join(cfg.save_path, 'final'))
 
