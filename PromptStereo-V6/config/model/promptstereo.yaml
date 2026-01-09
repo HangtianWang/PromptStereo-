@@ -10,6 +10,7 @@ instance:
     gwc_group: 8
     corr_level: 2
     corr_radius: 4
+    scale_list : [0.25, 0.5, 2.0, 4.0]
     n_downsample: 2
     pretrained_model:
       name: DepthAnythingV2

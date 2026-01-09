@@ -72,3 +72,48 @@ class CombinedGeometryEncodingVolume:
 
         return torch.cat(pyramid, dim=1)
     
+class CombinedGeometryEncodingVolumeScale:
+    def __init__(self, gev_pyramid, apc_pyramid, scale_list=[0.25, 0.5, 2.0, 4.0], scale_corr_radius=4):
+        self.scale_list = scale_list
+        self.radius = scale_corr_radius
+        # 这里的 gev_pyramid[0] 形状通常是 [B*H*W, G, 1, D_max]
+        self.gwc_vol_0 = gev_pyramid[0] 
+        # 这里的 apc_pyramid[0] 形状通常是 [B*H*W, 1, 1, W]
+        self.apc_vol_0 = apc_pyramid[0] 
+
+    def __call__(self, disp):
+        B, _, H, W = disp.shape
+        r = self.radius
+        
+        # [B*H*W, 1, 1, 1]
+        disp_flat = disp.view(B * H * W, 1, 1, 1)
+        
+        # [B*H*W, 1, 1, 1]
+        x0 = torch.arange(W).to(disp.device).view(1, 1, W, 1)\
+             .repeat(B, H, 1, 1).contiguous().view(B * H * W, 1, 1, 1)
+
+        # [1, 1, 2*r+1, 1]
+        sdx = torch.linspace(-r, r, 2 * r + 1, device=disp.device).view(1, 1, 2 * r + 1, 1)
+
+        out_pyramid = []
+
+        for scale in self.scale_list:
+            # [B*H*W, 1, 2*r+1, 1]
+            coords_gwc = sdx + (scale * disp_flat)
+            
+            # [B*H*W, G, 1, 2*r+1] -> [B, (2*r+1)*G, H, W]
+            gwc_s = corr_sampler(self.gwc_vol_0, coords_gwc)
+            gwc_s = gwc_s.view(B, H, W, -1).permute(0, 3, 1, 2)
+            out_pyramid.append(gwc_s)
+
+            # [B*H*W, 1, 2*r+1, 1]
+            coords_apc = sdx + (x0 - scale * disp_flat)
+            
+            # [B*H*W, 1, 1, 2*r+1] -> [B, 2*r+1, H, W]
+            apc_s = corr_sampler(self.apc_vol_0, coords_apc)
+            apc_s = apc_s.view(B, H, W, -1).permute(0, 3, 1, 2)
+            out_pyramid.append(apc_s)
+
+        # len(scale_list) * (G_channels + APC_channels)
+        return torch.cat(out_pyramid, dim=1)
+    

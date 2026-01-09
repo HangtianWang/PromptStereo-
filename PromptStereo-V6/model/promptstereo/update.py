@@ -98,6 +98,27 @@ class MotionEncoder(nn.Module):
 
         return torch.cat([out, disp], dim=1)
 
+class ScaleMotionEncoder(nn.Module):
+    def __init__(self, cfg):
+        super(ScaleMotionEncoder, self).__init__()
+        cor_plane = (cfg.gwc_group + 1) * (2 * cfg.corr_radius + 1) * len(cfg.scale_list)
+        self.convc1 = nn.Conv2d(cor_plane, cfg.pretrained_model.features // 2, 1, padding=0)
+        self.convc2 = nn.Conv2d(cfg.pretrained_model.features // 2, cfg.pretrained_model.features // 2, 3, padding=1)
+        self.convd1 = nn.Conv2d(1, cfg.pretrained_model.features // 2, 7, padding=3)
+        self.convd2 = nn.Conv2d(cfg.pretrained_model.features // 2, cfg.pretrained_model.features // 2, 3, padding=1)
+        self.conv = nn.Conv2d(cfg.pretrained_model.features, cfg.pretrained_model.features - 1, 3, padding=1)
+    
+    def forward(self, corr, disp):
+        cor = F.relu(self.convc1(corr), True)
+        cor = F.relu(self.convc2(cor), True)
+        dis = F.relu(self.convd1(disp), True)
+        dis = F.relu(self.convd2(dis), True)
+
+        out = torch.cat([cor, dis], dim=1)
+        out = F.relu(self.conv(out), True)
+
+        return torch.cat([out, disp], dim=1)
+
 class PromptStereoRecurrentUnit(nn.Module):
     def __init__(self, cfg, features, activation=nn.ReLU(False), deconv=False, bn=False, expand=False, align_corners=True, motion=False, size=None):
         super(PromptStereoRecurrentUnit, self).__init__()
@@ -231,11 +252,11 @@ class MultiPromptUpdateBlock(nn.Module):
 
 class ScaleMultiPromptUpdateBlock(nn.Module):
     def __init__(self, cfg, pretrained_state):
-        super(MultiPromptUpdateBlock, self).__init__()
+        super(ScaleMultiPromptUpdateBlock, self).__init__()
         self.stereo_pru = nn.ModuleList([PromptStereoRecurrentUnit(cfg, features=cfg.pretrained_model.features, bn=cfg.pretrained_model.use_bn, motion=(i == 0)) for i in range(len(cfg.pretrained_model.out_channels))])
         # self.stereo_align = nn.ModuleList([nn.Conv2d(cfg.pretrained_model.features, cfg.pretrained_model.features, 1, 1, 0) for _ in range(len(cfg.pretrained_model.out_channels))])
         self.structure_encoder = StructureEncoder(cfg)
-        self.motion_encoder = MotionEncoder(cfg)
+        self.motion_encoder = ScaleMotionEncoder(cfg)
         self.disp_head = DispHead(cfg)
         self.mask = nn.Sequential(
             nn.Conv2d(cfg.pretrained_model.features, cfg.pretrained_model.features, 3, 1, 1),

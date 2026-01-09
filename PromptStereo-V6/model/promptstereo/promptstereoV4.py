@@ -9,7 +9,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from accelerate import load_checkpoint_and_dispatch
-from .corr import CombinedGeometryEncodingVolume
+from .corr import CombinedGeometryEncodingVolume, CombinedGeometryEncodingVolumeScale
 from .update import MultiPromptUpdateBlock, ScaleMultiPromptUpdateBlock
 from .extractor import FeatureExtractor
 from .module import *
@@ -171,6 +171,12 @@ class PromptStereoV4(nn.Module):
         # Motion Prompt要求的输入之一
         # 输入形状为[B, D0, H/4, W/4] [B, D0, H/4, W/4] [B,G,maxdisp//4,H/4,W/4] 2 4
         corr_block = CombinedGeometryEncodingVolume(match_left, match_right, geometry_encoding_volume, self.cfg.corr_level, self.cfg.corr_radius)
+        corr_block_scale = CombinedGeometryEncodingVolumeScale(
+            gev_pyramid=corr_block.gev_pyramid, 
+            apc_pyramid=corr_block.apc_pyramid,
+            scale_list=self.cfg.scale_list,
+            scale_corr_radius=self.cfg.corr_radius
+        )
         # 融合预训练视觉大模型和可学习CNN提取的双目特征
         ctx_stereo = [block(torch.cat((x, y), dim=1)) for block, x, y in zip(self.cnet, feat_stereo, stem_list[1:])]
         ctx_left = [stereo[:B] for stereo in ctx_stereo]
@@ -213,20 +219,20 @@ class PromptStereoV4(nn.Module):
             disp = disp.detach()
             # corr形状为[B,C_out,H/4,W/4]，C_out=(2r+1)*(G+1)*level
             if itr < scale_iters:
-                corr = corr_block(disp, scaling=True)  # index correlation volume
-                with autocast(enabled=self.args.mixed_precision):
-                    net, scale_disp, up_mask = self.update_block(net, corr, disp, ctx_mono, norm_depth)
+                corr = corr_block_scale(disp)  # index correlation volume
+                with autocast(enabled=True):
+                    net, scale_disp, up_mask = self.scale_update_block(net, corr, disp, ctx_mono, norm_depth)
                 # F(t+1) = \Scale(t) x F(t)
                 disp = scale_disp * disp
             # 顺序做delta迭代
             else:
-                corr = corr_block(disp, scaling=False)  # index correlation volume
-                with autocast(enabled=self.args.mixed_precision):
-                    net, delta_disp, up_mask = self.scale_update_block(net, corr, disp, ctx_mono, norm_depth)
+                corr = corr_block(disp)  # index correlation volume
+                with autocast(enabled=True):
+                    net, delta_disp, up_mask = self.update_block(net, corr, disp, ctx_mono, norm_depth)
 
                     # To avoid unstability, we limit the disparity update within the searching range.
-                    delta_disp = torch.clip(delta_disp, min=-2**(self.args.corr_levels-1)*self.args.corr_radius,
-                                            max=2**(self.args.corr_levels-1)*self.args.corr_radius)
+                    delta_disp = torch.clip(delta_disp, min=-2**(self.cfg.corr_level-1)*self.cfg.corr_radius,
+                                            max=2**(self.cfg.corr_level-1)*self.cfg.corr_radius)
 
                 # F(t+1) = F(t) + \Delta(t)
                 disp = disp + delta_disp
@@ -245,7 +251,7 @@ class PromptStereoV4(nn.Module):
             return up_disp
 
         factor = 2 ** self.cfg.n_downsample
-        init_disp = context_upsample(init_disp * 4, spx_pred, factor)
+        init_disp = context_upsample(idepth * 4, spx_pred, factor)
 
         return init_disp, disp_pred
     
