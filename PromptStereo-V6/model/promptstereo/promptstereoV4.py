@@ -3,8 +3,10 @@
 # 1. 在update中,设计增加了一个基于原来promptstereo迭代器的scale迭代模块
 # 2. 修改了迭代流程，分为两节，并且在模型forward定义中新增了一个sclae_iters的scale迭代次数参数
 # 3. 在utils中增加了一个逆深度初始化函数，用于对单目大模型推理出来的逆视差进行处理
-# 4. 还需要设计一个scale迭代流程中的corr检索函数----施工中
-# 5. 注释掉了所有不需要的模块----大致完成，需要检查
+# 4. 设计了一个scale迭代流程中的corr检索函数
+# 5. 针对scale迭代阶段检索出来corr尺寸不同，设计了一个scale阶段的MotionEncoder,与原MotionEncoder主要是处理corr部分的尺寸不同
+# 6. 修改了StructureEncoder的使用逻辑，先验改为双目视差
+# 7. 注释掉了所有不需要的模块----大致完成，需要检查
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -77,21 +79,22 @@ class PromptStereoV4(nn.Module):
             ) for _ in range(len(cfg.pretrained_model.out_channels))
         ])
 
-        self.conf = nn.Sequential(
-            BasicConv(cfg.pretrained_model.features * 2, cfg.pretrained_model.features * 2, kernel_size=3, stride=1, padding=1),
-            nn.Conv2d(cfg.pretrained_model.features * 2, 1, 1, 1, 0),
-            nn.Sigmoid()
-        )
-        self.conf2 = nn.Sequential(
-            nn.Conv2d(4, 16, kernel_size=3, stride=1, padding=1, bias=False),
-            nn.BatchNorm2d(16),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(16, 1, kernel_size=1, stride=1, padding=0, bias=True),
-            nn.Sigmoid()
-        )
+        # self.conf = nn.Sequential(
+        #     BasicConv(cfg.pretrained_model.features * 2, cfg.pretrained_model.features * 2, kernel_size=3, stride=1, padding=1),
+        #     nn.Conv2d(cfg.pretrained_model.features * 2, 1, 1, 1, 0),
+        #     nn.Sigmoid()
+        # )
 
-        self.disp_att = DisparityAtt(self.cfg.gwc_max_disp // (2 ** self.cfg.n_downsample))
-        self.sobel = SobelEdge()
+        # self.conf2 = nn.Sequential(
+        #     nn.Conv2d(4, 16, kernel_size=3, stride=1, padding=1, bias=False),
+        #     nn.BatchNorm2d(16),
+        #     nn.ReLU(inplace=True),
+        #     nn.Conv2d(16, 1, kernel_size=1, stride=1, padding=0, bias=True),
+        #     nn.Sigmoid()
+        # )
+
+        # self.disp_att = DisparityAtt(self.cfg.gwc_max_disp // (2 ** self.cfg.n_downsample))
+        # self.sobel = SobelEdge()
 
     def freeze_bn(self):
         for m in self.modules():
@@ -154,6 +157,7 @@ class PromptStereoV4(nn.Module):
         prob = F.softmax(self.classifier(geometry_encoding_volume).squeeze(1), dim=1)
         # [B,1,H/4,W/4]
         init_disp = disparity_regression(prob, self.cfg.gwc_max_disp // (2 ** self.cfg.n_downsample))
+        norm_init_disp, _, _ = normalize_disparity(init_disp)
 
         del gwc_volume, concat_volume, comb_volume, prob
 
@@ -186,7 +190,7 @@ class PromptStereoV4(nn.Module):
 
         # 单双目视差融合成迭代起点的初始视差+Structure Prompt的要求输入
         # defom不相信双目视差的范围，所以这里的对齐也没有意义
-        norm_depth, _, _ = normalize_disparity(idepth)
+        # norm_depth, _, _ = normalize_disparity(idepth)
         # _, scale, shift = normalize_disparity(init_disp)
         # aligned_depth = norm_depth * scale[..., None, None] + shift[..., None, None]
         # scale, shift = compute_scale_shift(depth.clone().squeeze(1).to(torch.float32), init_disp.clone().squeeze(1).to(torch.float32))
@@ -221,14 +225,14 @@ class PromptStereoV4(nn.Module):
             if itr < scale_iters:
                 corr = corr_block_scale(disp)  # index correlation volume
                 with autocast(enabled=True):
-                    net, scale_disp, up_mask = self.scale_update_block(net, corr, disp, ctx_mono, norm_depth)
+                    net, scale_disp, up_mask = self.scale_update_block(net, corr, disp, ctx_mono, norm_init_disp)
                 # F(t+1) = \Scale(t) x F(t)
                 disp = scale_disp * disp
             # 顺序做delta迭代
             else:
                 corr = corr_block(disp)  # index correlation volume
                 with autocast(enabled=True):
-                    net, delta_disp, up_mask = self.update_block(net, corr, disp, ctx_mono, norm_depth)
+                    net, delta_disp, up_mask = self.update_block(net, corr, disp, ctx_mono, norm_init_disp)
 
                     # To avoid unstability, we limit the disparity update within the searching range.
                     delta_disp = torch.clip(delta_disp, min=-2**(self.cfg.corr_level-1)*self.cfg.corr_radius,
@@ -251,9 +255,9 @@ class PromptStereoV4(nn.Module):
             return up_disp
 
         factor = 2 ** self.cfg.n_downsample
-        init_disp = context_upsample(idepth * 4, spx_pred, factor)
+        init_disp_mono = context_upsample(idepth * 4, spx_pred, factor)
 
-        return init_disp, disp_pred
+        return init_disp_mono, disp_pred
     
 
 if __name__ == '__main__':

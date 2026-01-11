@@ -207,7 +207,7 @@ def get_occlusion_proxy(feat_left, warped_ctx_right):
 def initializate_mono_depth(idepth, idepth_scale = .25):
     # 映射为符合物理规律的初始视差范围，为scale迭代做准备
     bs = idepth.shape[0]
-    ow = idepth.shepe[-1]
+    ow = idepth.shape[-1]
     max_idepth, _ = torch.max(idepth.view(bs, -1), dim=1)
     max_idepth = max_idepth.detach().view(bs, 1, 1, 1) + 1e-8
     idepth = idepth / max_idepth * idepth_scale * ow + 0.01
