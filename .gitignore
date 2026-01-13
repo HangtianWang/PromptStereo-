@@ -2,3 +2,4 @@
 *.pyc
 PromptStereo-V6/wandb/
 PromptStereo-V6/outputs/
+PromptStereo-V6/demo_imgs/
