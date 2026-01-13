@@ -3,7 +3,7 @@ defaults:
  - _self_
 
 gpus: ${oc.env:CUDA_VISIBLE_DEVICES, '0,1,2,3'}
-checkpoint: /data/wxq/checkpoint/promptstereo-v6/exp14-aug-init/final/model.safetensors
+checkpoint: /data/wht/checkpoints/promptstereo/exp0/final/model.safetensors
 
 accelerator:
   _target_: accelerate.Accelerator
@@ -16,7 +16,7 @@ dataset:
   #   outlier: 1
   #   instance:
   #     _target_: dataset.stereo_dataset.SceneFlow
-  #     root: /data/datasets/sceneflow
+  #     root: /data/StereoDatasets/sceneflow
   #     dstype: frames_finalpass
   #     things_test: True
   #     mask: all
@@ -24,7 +24,7 @@ dataset:
   #   outlier: 3
   #   instance:
   #     _target_: dataset.stereo_dataset.KITTI
-  #     root: /data/StereoData/kitti
+  #     root: /data/StereoDatasets/kitti
   #     year: '2015'
   #     split: training
   #     mask: all
@@ -32,7 +32,7 @@ dataset:
     outlier: 2
     instance:
       _target_: dataset.stereo_dataset.Middlebury
-      root: /data/StereoData/middlebury
+      root: /data/StereoDatasets/middlebury
       year: '2021'
       split: training
       resolution: H
@@ -41,7 +41,7 @@ dataset:
   #   outlier: 1
   #   instance:
   #     _target_: dataset.stereo_dataset.ETH3D
-  #     root: /data/StereoData/eth3d
+  #     root: /data/StereoDatasets/eth3d
   #     split: training
   #     mask: noc
 

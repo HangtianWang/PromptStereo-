@@ -22,7 +22,7 @@ class PromptStereoV0(nn.Module):
 
         del vit
 
-        self.hourglass = HourGlass(cfg)
+        self.hourglass = HourGlass0(cfg)
         self.classifier = nn.Conv3d(cfg.gwc_group, 1, 3, 1, 1, bias=False)
 
         self.stem = nn.ModuleList([
@@ -130,6 +130,9 @@ class PromptStereoV0(nn.Module):
         _, scale, shift = normalize_disparity(init_disp)
         aligned_depth = norm_depth * scale[..., None, None] + shift[..., None, None]
         disp = conf * init_disp + (1 - conf) * aligned_depth
+        
+        # 可视化时用
+        # self.debug_fused_disp = disp
 
         disp_pred = []
         for itr in range(iters):
