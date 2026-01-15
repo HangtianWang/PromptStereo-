@@ -1,12 +1,13 @@
 # 1.利用对齐的单目初始视差对代价体的视差维度做强化
-# 2.增加从代价体中回归的熵值用于优化融合置信度
+# 2.增加从代价体中回归的熵值,左图warp后和右图的差值图，梯度图用于优化融合置信度
 # 3.代价体采用concat_volume+corr_volume
+# 4.迭代器的StructureEncoder做了改进，在迭代过程中引入单双目视差融合置信度conf
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from accelerate import load_checkpoint_and_dispatch
 from .corr import CombinedGeometryEncodingVolume
-from .update import MultiPromptUpdateBlock
+from .update import MultiPromptUpdateBlockV2
 from .extractor import FeatureExtractor
 from .module import *
 from util.util import *
@@ -20,7 +21,7 @@ class PromptStereoVx(nn.Module):
         vit = load_checkpoint_and_dispatch(vit, cfg.pretrained_model.checkpoint, strict=True)
 
         self.fnet = FeatureExtractor(cfg, vit.state_dict())
-        self.update_block = MultiPromptUpdateBlock(cfg, vit.depth_head.state_dict())
+        self.update_block = MultiPromptUpdateBlockV2(cfg, vit.depth_head.state_dict())
 
         del vit
 
@@ -177,13 +178,13 @@ class PromptStereoVx(nn.Module):
         # 获得融合置信度conf
         # 从代价体计算熵值[B, 1, H, W], 反应某一个像素的视差可信度
         entropy = calculate_disparity_entropy(geometry_encoding_volume)
-        # 计算左图和右图warp之后的左图的差异，显式反应遮挡关系
+        # 计算左图和warp之后右图的差异，显式反应遮挡关系
         error_map = get_occlusion_proxy(ctx_left[0], warped_ctx_right[0])
         # 计算梯度，反应边界位置，单目边界较模糊应该信赖锐利的双目边界
         grad_map = self.sobel(stem_left)
         # depth [B,1,H/4,W/4], init_disp [B,1,H/4,W/4]
         conf = self.conf(torch.cat((ctx_left[0], warped_ctx_right[0]), dim=1))
-        # 融合熵和置信度1得到最终置信度
+        # 融合熵、左右图差异、梯度和置信度1得到最终置信度
         conf = self.conf2(torch.cat((conf, entropy, error_map, grad_map), dim=1))
         disp = conf * init_disp + (1 - conf) * aligned_depth
 
@@ -192,7 +193,7 @@ class PromptStereoVx(nn.Module):
             disp = disp.detach()
             # corr形状为[B,C_out,H/4,W/4]，C_out=(2r+1)*(G+1)*level
             corr = corr_block(disp)
-            net, delta_disp, mask = self.update_block(net, corr, disp, ctx_mono, norm_depth)
+            net, delta_disp, mask = self.update_block(net, corr, disp, ctx_mono, norm_depth, conf)
             disp = disp + delta_disp
 
             if test_mode and itr < iters - 1:

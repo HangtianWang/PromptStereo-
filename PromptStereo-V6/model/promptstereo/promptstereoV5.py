@@ -1,24 +1,24 @@
-# baseline
+# 迭代器的StructureEncoder做了改进，在迭代过程中引入单双目视差融合置信度conf
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from accelerate import load_checkpoint_and_dispatch
 from .corr import CombinedGeometryEncodingVolume
-from .update import MultiPromptUpdateBlock
+from .update import MultiPromptUpdateBlockV2
 from .extractor import FeatureExtractor
 from .module import *
 from util.util import *
 
-class PromptStereoV0(nn.Module):
+class PromptStereoV5(nn.Module):
     def __init__(self, cfg):
-        super(PromptStereoV0, self).__init__()
+        super(PromptStereoV5, self).__init__()
         self.cfg = cfg
 
         vit = cfg.pretrained_model.instance
         vit = load_checkpoint_and_dispatch(vit, cfg.pretrained_model.checkpoint, strict=True)
 
         self.fnet = FeatureExtractor(cfg, vit.state_dict())
-        self.update_block = MultiPromptUpdateBlock(cfg, vit.depth_head.state_dict())
+        self.update_block = MultiPromptUpdateBlockV2(cfg, vit.depth_head.state_dict())
 
         del vit
 
@@ -138,7 +138,7 @@ class PromptStereoV0(nn.Module):
         for itr in range(iters):
             disp = disp.detach()
             corr = corr_block(disp)
-            net, delta_disp, mask = self.update_block(net, corr, disp, ctx_mono, norm_depth)
+            net, delta_disp, mask = self.update_block(net, corr, disp, ctx_mono, norm_depth, conf)
             disp = disp + delta_disp
 
             if test_mode and itr < iters - 1:
