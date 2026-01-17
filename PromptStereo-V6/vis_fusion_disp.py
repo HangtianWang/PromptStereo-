@@ -83,14 +83,20 @@ def main():
     # 5. 获取并保存可视化结果
     if hasattr(model, 'debug_fused_disp'):
         fused_disp = model.debug_fused_disp
+        stereo_disp = model.stereo_disp
+        mono_depth = model.mono_depth
         
         # 1. 关键步骤：去掉 Padding，恢复原始尺寸
         fused_disp = padder.unpad(fused_disp)
         out = padder.unpad(out)
+        stereo_disp = padder.unpad(stereo_disp)
+        mono_depth = padder.unpad(mono_depth)
         
         # 2. 转为 numpy [H, W]
         disp_vis = fused_disp.squeeze().cpu().numpy()
         out_vis = out.squeeze().cpu().numpy()
+        stereo_vis = stereo_disp.squeeze().cpu().numpy()
+        mono_vis = mono_depth.squeeze().cpu().numpy()
         
         # 3. 归一化到 0-255 (为了可视化)
         d_min = disp_vis.min()
@@ -106,21 +112,45 @@ def main():
             out_norm = (out_vis - out_min) / (out_max - out_min)
         else:
             out_norm = np.zeros_like(out_vis)
+
+        s_min = stereo_vis.min()
+        s_max = stereo_vis.max()
+        if s_max - s_min > 0:
+            stereo_norm = (stereo_vis - s_min) / (s_max - s_min)
+        else:
+            stereo_norm = np.zeros_like(stereo_vis)
+
+        m_min = mono_vis.min()
+        m_max = mono_vis.max()
+        if m_max - m_min > 0:
+            mono_norm = (mono_vis - m_min) / (m_max - m_min)
+        else:
+            mono_norm = np.zeros_like(mono_vis)
             
         disp_uint8 = (disp_norm * 255).astype(np.uint8)
         out_uint8 = (out_norm * 255).astype(np.uint8)
+        stereo_uint8 = (stereo_norm * 255).astype(np.uint8)
+        mono_uint8 = (mono_norm * 255).astype(np.uint8)
         
         # 4. 应用伪彩色 (INFERNO 配色方案接近 Magma，且对比度高)
         disp_color = cv2.applyColorMap(disp_uint8, cv2.COLORMAP_INFERNO)
         out_color = cv2.applyColorMap(out_uint8, cv2.COLORMAP_INFERNO)
+        stereo_color = cv2.applyColorMap(stereo_uint8, cv2.COLORMAP_INFERNO)
+        mono_color = cv2.applyColorMap(mono_uint8, cv2.COLORMAP_INFERNO)
         
         # 5. 直接保存图片，不含白边
         save_path0 = 'demo_imgs/vis_fusion_imgs/exp0_fusuion.png'
         save_path1 = 'demo_imgs/vis_fusion_imgs/exp0_out.png'
+        save_path2 = 'demo_imgs/vis_fusion_imgs/exp0_stereo.png'
+        save_path3 = 'demo_imgs/vis_fusion_imgs/exp0_mono.png'
         cv2.imwrite(save_path0, disp_color)
         cv2.imwrite(save_path1, out_color)
+        cv2.imwrite(save_path2, stereo_color)
+        cv2.imwrite(save_path3, mono_color)
         print(f"Visualization saved to: {save_path0} (Shape: {disp_color.shape})")
         print(f"Visualization saved to: {save_path1} (Shape: {out_color.shape})")
+        print(f"Visualization saved to: {save_path2} (Shape: {stereo_color.shape})")
+        print(f"Visualization saved to: {save_path3} (Shape: {mono_color.shape})")
 
     else:
         print("Error: 'debug_fused_disp' not found using model instance.")

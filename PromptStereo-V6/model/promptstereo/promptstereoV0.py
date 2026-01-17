@@ -133,6 +133,8 @@ class PromptStereoV0(nn.Module):
         
         # 可视化时用
         # self.debug_fused_disp = disp
+        # self.stereo_disp = init_disp
+        # self.mono_depth = aligned_depth
 
         disp_pred = []
         for itr in range(iters):
