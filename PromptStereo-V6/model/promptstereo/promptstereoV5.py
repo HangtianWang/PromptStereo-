@@ -22,7 +22,7 @@ class PromptStereoV5(nn.Module):
 
         del vit
 
-        self.hourglass = HourGlass0(cfg)
+        self.hourglass = HourGlass(cfg)
         self.classifier = nn.Conv3d(cfg.gwc_group, 1, 3, 1, 1, bias=False)
 
         self.stem = nn.ModuleList([
@@ -105,11 +105,13 @@ class PromptStereoV5(nn.Module):
         match_right = self.desc(torch.cat((feat_right[0], stem_list[1][B:]), dim=1))
 
         gwc_volume = build_gwc_volume(match_left, match_right, self.cfg.gwc_max_disp // (self.cfg.n_downsample ** 2), self.cfg.gwc_group)
-        geometry_encoding_volume = self.hourglass(gwc_volume, feat_left)
+        concat_volume = build_concat_volume(match_left, match_right, self.cfg.gwc_max_disp // (2 ** self.cfg.n_downsample))
+        comb_volume = torch.cat([gwc_volume, concat_volume], dim=1)
+        geometry_encoding_volume = self.hourglass(comb_volume, feat_left)
         prob = F.softmax(self.classifier(geometry_encoding_volume).squeeze(1), dim=1)
         init_disp = disparity_regression(prob, self.cfg.gwc_max_disp // (self.cfg.n_downsample ** 2))
 
-        del gwc_volume, prob
+        del gwc_volume, concat_volume, comb_volume, prob
 
         if not test_mode:
             xspx = self.spx_4(match_left)
@@ -154,3 +156,50 @@ class PromptStereoV5(nn.Module):
         init_disp = context_upsample(init_disp * 4, spx_pred, factor)
 
         return init_disp, disp_pred
+    
+
+if __name__ == '__main__':
+    import os
+    import hydra
+    from omegaconf import OmegaConf
+    import types
+
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    config_path = os.path.join(project_root, 'config', 'model', 'promptstereo.yaml')
+    
+    print(f"Loading config from: {config_path}")
+    full_cfg = OmegaConf.load(config_path)
+
+    OmegaConf.resolve(full_cfg)
+    cfg_omegaconf = full_cfg.instance.cfg
+
+    def dict_to_namespace(d):
+        x = types.SimpleNamespace()
+        for k, v in d.items():
+            if isinstance(v, dict):
+                setattr(x, k, dict_to_namespace(v))
+            else:
+                setattr(x, k, v)
+        return x
+
+    cfg_dict = OmegaConf.to_container(cfg_omegaconf, resolve=True)
+    cfg = dict_to_namespace(cfg_dict)
+
+    print(f"Instantiating pretrained model: {cfg.pretrained_model.name}")
+    instance_config = cfg_omegaconf.pretrained_model.instance
+    model_instance = hydra.utils.instantiate(instance_config)
+    cfg.pretrained_model.instance = model_instance
+
+    print("Initializing PromptStereo...")
+    model = PromptStereoV5(cfg).cuda().eval()
+
+    H, W = 448, 896
+    left = torch.randn(1, 3, H, W).cuda()
+    right = torch.randn(1, 3, H, W).cuda()
+
+    print(f"Running forward pass with input shape: {left.shape}")
+    with torch.no_grad():
+        init_disp, disp_preds = model(left, right, iters=2, test_mode=False)
+
+    print(f"Init Disp Shape: {init_disp.shape}")
+    print(f"Final Disp Shape: {disp_preds[-1].shape}")
