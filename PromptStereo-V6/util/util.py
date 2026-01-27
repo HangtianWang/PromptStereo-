@@ -213,3 +213,12 @@ def initializate_mono_depth(idepth, idepth_scale = .25):
     idepth = idepth / max_idepth * idepth_scale * ow + 0.01
 
     return idepth
+
+def rescale_modulation(itr, iters, modulation_alg="linear", modulation_ratio=1.0):
+    if modulation_alg == "linear":
+        ratio = modulation_ratio * itr / iters
+    elif modulation_alg == "sigmoid":
+        ratio = modulation_ratio * 1 / (1 + np.exp(-2 * (itr - 5)))
+    else:
+        raise Exception("Not supported modulation_alg: {}".format(modulation_alg))
+    return ratio

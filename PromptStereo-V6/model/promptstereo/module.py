@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import re
+from torch.distributions import Beta
 
 class BasicConv(nn.Module):
     def __init__(self, in_channel, out_channel, deconv=False, is_3d=False, norm='instance', relu='leaky', **kwargs):
@@ -284,3 +286,168 @@ class SobelEdge(nn.Module):
         edge = edge / (edge.max().detach() + 1e-6)
         
         return edge # [B, 1, H/4, W/4]
+    
+class LBPEncoder(nn.Module):
+    def __init__(self, offsets_str='(-1,-1), (1,1), (1,-1), (-1,1)'):
+        super().__init__()
+        # 1. 解析字符串获取偏移量列表
+        matches = re.findall(r'\((-?\d+),\s*(-?\d+)\)', offsets_str)
+        if not matches:
+            raise ValueError(f"Invalid offsets format: {offsets_str}")
+        offsets = [(int(y), int(x)) for y, x in matches]
+        
+        # 2. 根据最大偏移量确定卷积核大小
+        num_neighbors = len(offsets)
+        max_offset = max(max(abs(y), abs(x)) for y, x in offsets)
+        kernel_size = 2 * max_offset + 1
+        center = max_offset # 中心点坐标
+        
+        # 3. 构建深度卷积层 (不更新权重)
+        self.lbp_conv = nn.Conv2d(
+            in_channels=1, 
+            out_channels=num_neighbors,
+            kernel_size=kernel_size, 
+            padding=max_offset,
+            padding_mode="replicate", 
+            bias=False
+        )
+        
+        # 4. 手动设置卷积权重: Neighbor - Center
+        weight = torch.zeros((num_neighbors, 1, kernel_size, kernel_size))
+        for i, (dy, dx) in enumerate(offsets):
+            # 将中心设为 -1，邻域设为 1，实现差分计算
+            weight[i, 0, center + dy, center + dx] = 1.0
+            weight[i, 0, center, center] = -1.0
+            
+        self.lbp_conv.weight = nn.Parameter(weight, requires_grad=False)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        """
+        Args:
+            x: [Batch, 1, H, W] Grayscale image
+        Returns:
+            out: [Batch, num_neighbors, H, W] LBP features in range (0, 1)
+        """
+        return self.sigmoid(self.lbp_conv(x))
+    
+
+class BMResidualBlock(nn.Module):
+    def __init__(self, in_planes, planes, norm_fn='group', stride=1):
+        super(BMResidualBlock, self).__init__()
+  
+        self.conv1 = nn.Conv2d(in_planes, planes, kernel_size=3, padding=1, stride=stride)
+        self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, padding=1)
+        self.relu = nn.ReLU(inplace=True)
+
+        num_groups = planes // 8
+
+        if norm_fn == 'group':
+            self.norm1 = nn.GroupNorm(num_groups=num_groups, num_channels=planes)
+            self.norm2 = nn.GroupNorm(num_groups=num_groups, num_channels=planes)
+            if not (stride == 1 and in_planes == planes):
+                self.norm3 = nn.GroupNorm(num_groups=num_groups, num_channels=planes)
+        
+        elif norm_fn == 'batch':
+            self.norm1 = nn.BatchNorm2d(planes)
+            self.norm2 = nn.BatchNorm2d(planes)
+            if not (stride == 1 and in_planes == planes):
+                self.norm3 = nn.BatchNorm2d(planes)
+        
+        elif norm_fn == 'instance':
+            self.norm1 = nn.InstanceNorm2d(planes)
+            self.norm2 = nn.InstanceNorm2d(planes)
+            if not (stride == 1 and in_planes == planes):
+                self.norm3 = nn.InstanceNorm2d(planes)
+
+        elif norm_fn == 'none':
+            self.norm1 = nn.Sequential()
+            self.norm2 = nn.Sequential()
+            if not (stride == 1 and in_planes == planes):
+                self.norm3 = nn.Sequential()
+
+        if stride == 1 and in_planes == planes:
+            self.downsample = None
+        
+        else:    
+            self.downsample = nn.Sequential(
+                nn.Conv2d(in_planes, planes, kernel_size=1, stride=stride), self.norm3)
+
+
+    def forward(self, x):
+        y = x
+        y = self.conv1(y)
+        y = self.norm1(y)
+        y = self.relu(y)
+        y = self.conv2(y)
+        y = self.norm2(y)
+        y = self.relu(y)
+
+        if self.downsample is not None:
+            x = self.downsample(x)
+
+        return self.relu(x+y)
+    
+
+class BetaModulator(nn.Module):
+    def __init__(self, lbp_dim=4, hidden_dim=None, modulation_ratio=1.0, norm_fn='batch'):
+        super(BetaModulator, self).__init__()
+        self.modulation_ratio = modulation_ratio
+        
+        # 确定中间层维度，默认维持 lbp_dim
+        if hidden_dim is None:
+            hidden_dim = lbp_dim
+            
+        # 1. 编码器 (Encoder): 提取 LBP 特征的深层表示
+        # 输入维度: lbp_dim * 2 (因为拼接了 disp 和 depth 的 LBP 特征)
+        self.conv1 = nn.Sequential(
+            nn.Conv2d(lbp_dim * 2, hidden_dim * 2, kernel_size=3, padding=1, bias=True),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(hidden_dim * 2, hidden_dim * 2, kernel_size=3, padding=1, bias=True),
+        )
+        
+        # 2. 上下文聚合 (Context Aggregation): U-Net 类似的下采样和上采样
+        down_dim = 64 if hidden_dim * 2 < 64 else 128
+        self.down = nn.Sequential(
+            BMResidualBlock(hidden_dim * 2, down_dim, norm_fn, stride=2),
+            BMResidualBlock(down_dim, 128, norm_fn, stride=1)
+        )
+        self.up = nn.ConvTranspose2d(128, hidden_dim * 2, kernel_size=2, stride=2)
+        
+        # 3. 参数预测头 (Head): 预测 Beta 分布的 alpha 和 beta 参数
+        # 输入: concat(Encoder特征, 上采样特征)
+        self.conv2 = nn.Sequential(
+            nn.Conv2d(hidden_dim * 4, hidden_dim, kernel_size=3, padding=1, bias=False),
+            nn.Softplus(),
+            nn.Conv2d(hidden_dim, 2, kernel_size=1, padding=0, bias=False),
+            nn.Softplus(), # 保证输出非负
+        )
+
+    def forward(self, lbp_disp, lbp_depth):
+        """
+        输入:
+             lbp_disp: [B, lbp_dim, H, W] 视差图的 LBP 特征
+             lbp_depth: [B, lbp_dim, H, W] 深度图(先验)的 LBP 特征
+        输出:
+             modulation: [B, 1, H, W] 融合系数 (0~1)
+        """
+        # 特征提取
+        x1 = self.conv1(torch.cat([lbp_disp, lbp_depth], dim=1))
+        x2 = self.up(self.down(x1))
+        
+        # 预测 alpha 和 beta 参数 (加 1 是为了保证分布的形状是有意义的，避免极端情况)
+        beta_paras = self.conv2(torch.cat([x1, x2], dim=1)) + 1 
+
+        # 构建 Beta 分布
+        alpha, beta = torch.split(beta_paras, 1, dim=1)
+        distribution = Beta(alpha, beta)
+
+        # 采样或取均值
+        if self.training:
+            # 训练时使用重参数化技巧进行采样，增加随机性以提高鲁棒性
+            modulation = distribution.rsample()
+        else:
+            # 推理时使用均值，保证确定性
+            modulation = distribution.mean
+        
+        return modulation

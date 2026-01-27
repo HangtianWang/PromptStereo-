@@ -77,6 +77,9 @@ class PromptStereoVx(nn.Module):
         self.disp_att = DisparityAtt(self.cfg.gwc_max_disp // (2 ** self.cfg.n_downsample))
         self.sobel = SobelEdge()
 
+        self.lbp_encoder = LBPEncoder(cfg.lbp_offsets_str)
+        self.modulater = BetaModulator(cfg.lbp_dim, cfg.modulation_hidden_dim, cfg.modulation_ratio)
+
     def freeze_bn(self):
         for m in self.modules():
             if isinstance(m, nn.BatchNorm2d):
@@ -105,6 +108,8 @@ class PromptStereoVx(nn.Module):
         # 假设cfg.feat_dim为 [D0, D1, D2, D3]
         # 单目深度图 [B, 1, H/4, W/4]
         feat_mono, feat_stereo, depth = self.fnet(torch.cat((left, right), dim=0))
+        # 对深度图做软LBP操作，得到LBP图，形状为[B,4,H/4,W/4]，除以192防止被大数值淹没
+        depth_lbp = self.lbp_encoder(depth/self.cfg.gwc_max_disp)
         # 单目特征图只取左侧
         # 单目特征组 [B,D3, H/4, W/4] [B, D3, H/8, W/8] [B, D3, H/16, W/16] [B, D3, H/32, W/32]
         ctx_mono = feat_mono[:B]
@@ -176,12 +181,13 @@ class PromptStereoVx(nn.Module):
 
         del prob
         # 获得融合置信度conf
-        # 从代价体计算熵值[B, 1, H, W], 反应某一个像素的视差可信度
+        # 从代价体计算熵值, 反应某一个像素的视差可信度，[B,1,H,W]，归一化后的
         entropy = calculate_disparity_entropy(geometry_encoding_volume)
-        # 计算左图和warp之后右图的差异，显式反应遮挡关系
+        # 计算左图和warp之后右图的差异，显式反应遮挡关系，[B,1,H,W]，归一化后的
         error_map = get_occlusion_proxy(ctx_left[0], warped_ctx_right[0])
-        # 计算梯度，反应边界位置，单目边界较模糊应该信赖锐利的双目边界
+        # 计算梯度，反应边界位置，单目边界较模糊应该信赖锐利的双目边界，[B,1,H,W]，归一化后的
         grad_map = self.sobel(stem_left)
+        flat_map = 1 - grad_map
         # depth [B,1,H/4,W/4], init_disp [B,1,H/4,W/4]
         conf = self.conf(torch.cat((ctx_left[0], warped_ctx_right[0]), dim=1))
         # 融合熵、左右图差异、梯度和置信度1得到最终置信度
@@ -194,6 +200,15 @@ class PromptStereoVx(nn.Module):
             # corr形状为[B,C_out,H/4,W/4]，C_out=(2r+1)*(G+1)*level
             corr = corr_block(disp)
             net, delta_disp, mask = self.update_block(net, corr, disp, ctx_mono, norm_depth, conf)
+            
+            # 参考Diving into the Fusion的ILF模块，对delta_disp做置信度微调
+            # 同样，对视差做lbp操作，得到[B,4,H/4,W/4]
+            disp_lbp = self.lbp_encoder(disp/self.cfg.gwc_max_disp)
+            # 计算单双目lbp一致性图，形状为[B,1,H/4,W/4]
+            modulation = self.modulater(disp_lbp, depth_lbp)
+            modulation_weight = rescale_modulation(itr, iters)
+            delta_disp = delta_disp * (1 + modulation * modulation_weight)
+
             disp = disp + delta_disp
 
             if test_mode and itr < iters - 1:

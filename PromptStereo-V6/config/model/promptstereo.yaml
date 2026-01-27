@@ -12,6 +12,11 @@ instance:
     corr_radius: 4
     scale_list : [0.25, 0.5, 2.0, 4.0]
     n_downsample: 2
+    lbp_offsets_str: (-1,-1), (1,1), (1,-1), (-1,1)
+    #需与上对应
+    lbp_dim: 4
+    modulation_hidden_dim:
+    modulation_ratio: 1.0
     pretrained_model:
       name: DepthAnythingV2
       checkpoint: /data/wht/checkpoints/monster/depth_anything_v2_vitl.pth
