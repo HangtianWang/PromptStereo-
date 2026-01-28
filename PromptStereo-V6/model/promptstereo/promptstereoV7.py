@@ -1,4 +1,5 @@
-# 仅把代价体由gwc_volume改为comb_volume
+# 1.仅把代价体由gwc_volume改为comb_volume
+# 2.参考Diving into the Fusion的ILF模块，在迭代过程中对delta_disp做置信度整合，调整其贡献
 import torch
 import torch.nn as nn
 import torch.nn.functional as F

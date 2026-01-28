@@ -451,3 +451,82 @@ class BetaModulator(nn.Module):
             modulation = distribution.mean
         
         return modulation
+    
+
+import torch
+import torch.nn as nn
+
+class MonoParamEstimator(nn.Module):
+    def __init__(self, in_channels=2, use_global_pool=True):
+        """
+        Args:
+            in_channels (int): 输入通道数 (通常是 disp + depth = 2)
+            use_global_pool (bool): 是否开启全局池化以输出全局参数 a, b
+        """
+        super(MonoParamEstimator, self).__init__()
+        self.use_global_pool = use_global_pool
+
+        # 逐级降低分辨率，提取抽象特征
+        self.enc1 = self._conv_block(in_channels, 32)
+        self.pool1 = nn.MaxPool2d(2)
+        
+        self.enc2 = self._conv_block(32, 64)
+        self.pool2 = nn.MaxPool2d(2)
+        
+        self.bottleneck = self._conv_block(64, 128)
+
+        # 恢复空间分辨率，并通过 concat 融合浅层细节
+        self.up2 = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
+        self.dec2 = self._conv_block(128 + 64, 64)
+        
+        self.up1 = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
+        self.dec1 = self._conv_block(64 + 32, 32)
+
+        # 输出 2 通道: Channel 0 -> Scale (a), Channel 1 -> Shift (b)
+        self.head = nn.Conv2d(32, 2, kernel_size=1)
+        
+        # 池化，将 HxW 压缩为 1x1，实现全局参数估计
+        self.global_pool = nn.AdaptiveAvgPool2d((1, 1))
+
+    def _conv_block(self, in_ch, out_ch):
+        """基础卷积块: Conv-BN-ReLU x2"""
+        return nn.Sequential(
+            nn.Conv2d(in_ch, out_ch, 3, padding=1),
+            nn.BatchNorm2d(out_ch),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(out_ch, out_ch, 3, padding=1),
+            nn.BatchNorm2d(out_ch),
+            nn.ReLU(inplace=True)
+        )
+
+    def forward(self, disp, depth):
+        """
+        Args:
+            disp: [B, 1, H, W] 视差图
+            depth: [B, 1, H, W] 单目深度
+        Returns:
+            a: [B, 1, 1, 1] Scale 参数
+            b: [B, 1, 1, 1] Shift 参数
+        """
+        # 拼接输入
+        x = torch.cat([disp, depth], dim=1)
+        
+        # Forward U-Net
+        e1 = self.enc1(x)
+        e2 = self.enc2(self.pool1(e1))
+        b_feat = self.bottleneck(self.pool2(e2))
+        
+        d2 = self.dec2(torch.cat([self.up2(b_feat), e2], dim=1))
+        d1 = self.dec1(torch.cat([self.up1(d2), e1], dim=1))
+        
+        # 预测密集参数图 [B, 2, H, W]
+        out = self.head(d1)
+        
+        # 全局池化，获取全局参数 [B, 2, 1, 1]
+        if self.use_global_pool:
+            out = self.global_pool(out)
+            
+        # 拆分为 a 和 b
+        a, b = torch.split(out, 1, dim=1)
+        
+        return a, b

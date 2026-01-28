@@ -6,3 +6,4 @@ from .promptstereoV4 import PromptStereoV4
 from .promptstereoV5 import PromptStereoV5
 from .promptstereoV6 import PromptStereoV6
 from .promptstereoV7 import PromptStereoV7
+from .promptstereoV8 import PromptStereoV8
