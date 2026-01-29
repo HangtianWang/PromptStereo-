@@ -96,7 +96,7 @@ class PromptStereoV7(nn.Module):
         feat_mono, feat_stereo, depth = self.fnet(torch.cat((left, right), dim=0))
         
         # 对深度图做软LBP操作，得到LBP图，形状为[B,4,H/4,W/4]，除以192防止被大数值淹没
-        depth_lbp = self.lbp_encoder(depth/self.cfg.gwc_max_disp)
+        depth_lbp = self.lbp_encoder(depth)
         ctx_mono = feat_mono[:B]
 
         feat_left = [stereo[:B] for stereo in feat_stereo]
@@ -161,7 +161,7 @@ class PromptStereoV7(nn.Module):
 
             # 参考Diving into the Fusion的ILF模块，对delta_disp做置信度微调
             # 同样，对视差做lbp操作，得到[B,4,H/4,W/4]
-            disp_lbp = self.lbp_encoder(disp/self.cfg.gwc_max_disp)
+            disp_lbp = self.lbp_encoder(disp)
             # 计算单双目lbp一致性图，形状为[B,1,H/4,W/4]
             modulation = self.modulater(disp_lbp, depth_lbp)
             modulation_weight = rescale_modulation(itr, iters)
