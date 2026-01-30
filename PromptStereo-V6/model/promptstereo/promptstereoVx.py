@@ -4,6 +4,8 @@
 # 4.迭代器的StructureEncoder做了改进，在迭代过程中引入单双目视差融合置信度conf
 # 5.参考Diving into the Fusion的ILF模块，在迭代过程中对delta_disp做置信度整合，调整其贡献
 # 6.使用unet预测一组对齐的scale和shift，在中位值对齐的基础上进一步细对齐
+# 7.使用滑动窗口自注意力优化左右特征图，并且使用左特征图的注意力图优化gwc代价体-----只使用一次窗口自注意力，需评估显存开销，考虑引入滑动窗口注意力
+# 8.把措施1移动到了3D卷积处理代价体之前，只强化gwc代价体
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -84,6 +86,9 @@ class PromptStereoVx(nn.Module):
 
         self.monoparamest = MonoParamEstimator()
 
+        self.featattn = WindowAttentionWithMap(cfg.feat_dim[0], window_size=cfg.feat_attn_win_size, num_heads=cfg.feat_attn_num_heads)
+        self.space_costv_refine = AttentionGuidedCostRefiner(cfg.feat_attn_win_size)
+
     def freeze_bn(self):
         for m in self.modules():
             if isinstance(m, nn.BatchNorm2d):
@@ -114,6 +119,8 @@ class PromptStereoVx(nn.Module):
         feat_mono, feat_stereo, depth = self.fnet(torch.cat((left, right), dim=0))
         # 对深度图做软LBP操作，得到LBP图，形状为[B,4,H/4,W/4]
         depth_lbp = self.lbp_encoder(depth)
+        # 标准化单目深度图，备用
+        norm_depth, _, _ = normalize_disparity(depth)
         # 单目特征图只取左侧
         # 单目特征组 [B,D3, H/4, W/4] [B, D3, H/8, W/8] [B, D3, H/16, W/16] [B, D3, H/32, W/32]
         ctx_mono = feat_mono[:B]
@@ -132,9 +139,18 @@ class PromptStereoVx(nn.Module):
         # 融合预训练分支和可学习分支提取的特征，四分之一分辨率，输出为[B, D0, H/4, W/4]
         match_left = self.desc(torch.cat((feat_left[0], stem_list[1][:B]), dim=1))
         match_right = self.desc(torch.cat((feat_right[0], stem_list[1][B:]), dim=1))
+        # 滑动窗口自注意力优化左右特征图
+        match_left, left_attn_map= self.featattn(match_left)
+        match_right, _ = self.featattn(match_right)
         # 构建代价体，代价体聚合，初始视差回归
         # [B,G,maxdisp//4,H/4,W/4]
         gwc_volume = build_gwc_volume(match_left, match_right, self.cfg.gwc_max_disp // (2 ** self.cfg.n_downsample), self.cfg.gwc_group)
+        # 利用注意力图对代价体做空间维度上的优化
+        gwc_volume = self.space_costv_refine(gwc_volume, left_attn_map)
+        # 利用对齐后的单目视差图沿视差维度增强代价体，获得新的初始视差
+        _, gwc_scale, gwc_shift = normalize_disparity(disparity_regression(F.softmax(self.classifier(gwc_volume).squeeze(1), dim=1), self.cfg.gwc_max_disp // (2 ** self.cfg.n_downsample)))
+        gwc_aligned_depth = norm_depth * gwc_scale[..., None, None] + gwc_shift[..., None, None]
+        gwc_volume = self.disp_att(gwc_volume, gwc_aligned_depth)
         # [B,2*D0,maxdisp//4,H/4,W/4]
         concat_volume = build_concat_volume(match_left, match_right, self.cfg.gwc_max_disp // (2 ** self.cfg.n_downsample))
         # [B,2*D0+G,maxdisp//4,H/4,W/4]
@@ -146,7 +162,7 @@ class PromptStereoVx(nn.Module):
         # [B,1,H/4,W/4]
         init_disp = disparity_regression(prob, self.cfg.gwc_max_disp // (2 ** self.cfg.n_downsample))
 
-        del gwc_volume, concat_volume, comb_volume, prob
+        del gwc_volume, concat_volume, comb_volume, prob, gwc_aligned_depth
 
         # 指导初始视差上采样的准备
         if not test_mode:
@@ -170,23 +186,21 @@ class PromptStereoVx(nn.Module):
         net = [block(torch.cat((x, y), dim=1)) for block, x, y in zip(self.hnet, ctx_left, warped_ctx_right)]
 
         # 单双目视差融合成迭代起点的初始视差+Structure Prompt的要求输入
-        norm_depth, _, _ = normalize_disparity(depth)
+        
         _, scale, shift = normalize_disparity(init_disp)
         aligned_depth = norm_depth * scale[..., None, None] + shift[..., None, None]
-        # scale, shift = compute_scale_shift(depth.clone().squeeze(1).to(torch.float32), init_disp.clone().squeeze(1).to(torch.float32))
-        # aligned_depth = scale * depth + shift
         # 进一步微调scale和shift
         delta_scale, delta_shift = self.monoparamest(init_disp, aligned_depth)
         aligned_depth = (1+delta_scale) * aligned_depth + delta_shift
 
         # 利用对齐后的单目视差图沿视差维度增强代价体，获得新的初始视差
-        geometry_encoding_volume = self.disp_att(geometry_encoding_volume, aligned_depth)
+        # geometry_encoding_volume = self.disp_att(geometry_encoding_volume, aligned_depth)
         # Init disp from geometry encoding volume [B,maxdisp//4,H/4,W/4]
-        prob = F.softmax(self.classifier(geometry_encoding_volume).squeeze(1), dim=1)
+        # prob = F.softmax(self.classifier(geometry_encoding_volume).squeeze(1), dim=1)
         # [B,1,H/4,W/4]
-        init_disp = disparity_regression(prob, self.cfg.gwc_max_disp // (2 ** self.cfg.n_downsample))
+        # init_disp = disparity_regression(prob, self.cfg.gwc_max_disp // (2 ** self.cfg.n_downsample))
 
-        del prob
+        # del prob
         # 获得融合置信度conf
         # 从代价体计算熵值, 反应某一个像素的视差可信度，[B,1,H,W]，归一化后的
         # entropy = calculate_disparity_entropy(geometry_encoding_volume)

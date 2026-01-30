@@ -530,3 +530,120 @@ class MonoParamEstimator(nn.Module):
         a, b = torch.split(out, 1, dim=1)
         
         return a, b
+
+class WindowAttentionWithMap(nn.Module):
+    def __init__(self, dim=64, window_size=8, num_heads=4):
+        super().__init__()
+        self.dim = dim
+        self.window_size = window_size
+        self.num_heads = num_heads
+        self.scale = (dim // num_heads) ** -0.5
+
+        self.qkv = nn.Linear(dim, dim * 3, bias=True)
+        self.proj = nn.Linear(dim, dim)
+
+    def window_partition(self, x):
+        """
+        Args:
+            x: (B, H, W, C)
+        Returns:
+            windows: (num_windows*B, window_size*window_size, C)
+        """
+        B, H, W, C = x.shape
+        # 将特征图重塑为窗口布局
+        x = x.view(B, H // self.window_size, self.window_size, W // self.window_size, self.window_size, C)
+        # 维度置换: [B, H/M, W/M, M, M, C] -> [B, H/M, W/M, M*M, C]
+        windows = x.permute(0, 1, 3, 2, 4, 5).contiguous().view(-1, self.window_size * self.window_size, C)
+        return windows
+
+    def window_reverse(self, windows, H, W):
+        """
+        Args:
+            windows: (num_windows*B, window_size*window_size, C)
+        Returns:
+            x: (B, H, W, C)
+        """
+        B = int(windows.shape[0] / (H * W / self.window_size / self.window_size))
+        x = windows.view(B, H // self.window_size, W // self.window_size, self.window_size, self.window_size, -1)
+        x = x.permute(0, 1, 3, 2, 4, 5).contiguous().view(B, H, W, -1)
+        return x
+
+    def forward(self, x):
+        # x shape: [B, C, H, W] -> [1, 64, 112, 224]
+        B, C, H, W = x.shape
+        x = x.permute(0, 2, 3, 1) # [B, H, W, C]
+
+        # 切分窗口
+        x_windows = self.window_partition(x)  # [B*N_win, 64, 64]
+        
+        # 计算 Q, K, V
+        B_, N, C_ = x_windows.shape
+        qkv = self.qkv(x_windows).reshape(B_, N, 3, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
+        q, k, v = qkv[0], qkv[1], qkv[2]  # [B*N_win, Heads, M^2, Head_Dim]
+
+        # 计算 Attention Score
+        q = q * self.scale
+        attn = (q @ k.transpose(-2, -1)) # [B*N_win, Heads, M^2, M^2]
+        
+        # 获取 Attention Map 并保存
+        attn_map = attn.softmax(dim=-1) 
+
+        # 特征加权
+        x_windows_new = (attn_map @ v).transpose(1, 2).reshape(B_, N, C_)
+        x_windows_new = self.proj(x_windows_new)
+
+        # 还原回大图
+        x_out = self.window_reverse(x_windows_new, H, W) # [B, H, W, C]
+        x_out = x_out.permute(0, 3, 1, 2) # [B, C, H, W]
+
+        return x_out, attn_map
+    
+
+class AttentionGuidedCostRefiner(nn.Module):
+    def __init__(self, window_size=8):
+        super().__init__()
+        self.window_size = window_size
+
+    def window_partition(self, x):
+        # 复用同样的切分逻辑
+        B, H, W, C = x.shape
+        x = x.view(B, H // self.window_size, self.window_size, W // self.window_size, self.window_size, C)
+        windows = x.permute(0, 1, 3, 2, 4, 5).contiguous().view(-1, self.window_size * self.window_size, C)
+        return windows
+
+    def window_reverse(self, windows, H, W):
+        B = int(windows.shape[0] / (H * W / self.window_size / self.window_size))
+        x = windows.view(B, H // self.window_size, W // self.window_size, self.window_size, self.window_size, -1)
+        x = x.permute(0, 1, 3, 2, 4, 5).contiguous().view(B, H, W, -1)
+        return x
+
+    def forward(self, cost_volume, attn_map):
+        """
+        cost_volume: [B, G, D, H, W]
+        attn_map: [B*N_win, Heads, M^2, M^2] (From Step 1)
+        """
+        B, G, D, H, W = cost_volume.shape
+        
+        # 变形: 将 G 和 D 合并为通道
+        # 现在的形状: [B, G*D, H, W]
+        cv_reshaped = cost_volume.view(B, G * D, H, W).permute(0, 2, 3, 1) # [B, H, W, G*D]
+
+        # 切分窗口
+        # Shape: [B*N_win, M^2, G*D]
+        cv_windows = self.window_partition(cv_reshaped)
+
+        # 处理 Attention Map 特征图可能有多个 Head，但代价体不需要 Head 的概念,对 Heads 维度取平均，得到通用的空间亲和矩阵。
+        # Input: [B*N_win, Heads, M^2, M^2] -> Output: [B*N_win, M^2, M^2]
+        attn_map_avg = attn_map.mean(dim=1)
+
+        # 矩阵乘法
+        # [B*N_win, M^2, M^2] @ [B*N_win, M^2, G*D] -> [B*N_win, M^2, G*D]
+        # 含义：每个像素的代价 = 它周围窗口内像素代价的加权和
+        cv_refined_windows = torch.matmul(attn_map_avg, cv_windows)
+
+        # 还原形状
+        cv_refined = self.window_reverse(cv_refined_windows, H, W) # [B, H, W, G*D]
+        cv_refined = cv_refined.permute(0, 3, 1, 2).view(B, G, D, H, W)
+        
+        # 残差连接
+        return cost_volume + cv_refined

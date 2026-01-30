@@ -17,6 +17,8 @@ instance:
     lbp_dim: 4
     modulation_hidden_dim:
     modulation_ratio: 1.0
+    feat_attn_win_size: 8
+    feat_attn_num_heads: 4
     pretrained_model:
       name: DepthAnythingV2
       checkpoint: /data/wht/checkpoints/monster/depth_anything_v2_vitl.pth
