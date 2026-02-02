@@ -7,3 +7,7 @@ from .promptstereoV5 import PromptStereoV5
 from .promptstereoV6 import PromptStereoV6
 from .promptstereoV7 import PromptStereoV7
 from .promptstereoV8 import PromptStereoV8
+from .promptstereoV9 import PromptStereoV9
+from .promptstereoV10 import PromptStereoV10
+from .promptstereoV11 import PromptStereoV11
+from .promptstereoV12 import PromptStereoV12
