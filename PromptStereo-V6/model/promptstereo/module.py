@@ -236,7 +236,7 @@ class DisparityAtt(nn.Module):
         else:
             self.sigma = 2.0
         
-        self.amplitude = nn.Parameter(torch.tensor(0.01))
+        self.amplitude = nn.Parameter(torch.tensor(0.5))
 
     def forward(self, cv, pred_disp):
         """
@@ -253,7 +253,8 @@ class DisparityAtt(nn.Module):
         
         #高斯分布 [B, 1, D, H, W]
         gaussian_weight = torch.exp(- (dist ** 2) / (2 * sigma ** 2))
-        output = cv + self.amplitude * gaussian_weight
+        output = cv + self.amplitude * gaussian_weight * cv
+        # print("cv.max:",cv.max(),"amplitude * gaussian_weight", (self.amplitude * gaussian_weight).max(), "amplitude", self.amplitude)
         
         return output
     

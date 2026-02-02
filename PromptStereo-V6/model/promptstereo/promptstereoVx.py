@@ -5,7 +5,7 @@
 # 5.参考Diving into the Fusion的ILF模块，在迭代过程中对delta_disp做置信度整合，调整其贡献
 # 6.使用unet预测一组对齐的scale和shift，在中位值对齐的基础上进一步细对齐
 # 7.使用滑动窗口自注意力优化左右特征图，并且使用左特征图的注意力图优化gwc代价体-----只使用一次窗口自注意力，需评估显存开销，考虑引入滑动窗口注意力
-# 8.把措施1移动到了3D卷积处理代价体之前，只强化gwc代价体
+# 8.把措施1移动到了3D卷积处理代价体之前，只强化gwc代价体，修改增强方式为乘性增强并残差连接
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -66,15 +66,15 @@ class PromptStereoVx(nn.Module):
         ])
 
         self.conf = nn.Sequential(
-            BasicConv(cfg.pretrained_model.features * 2, cfg.pretrained_model.features * 2, kernel_size=3, stride=1, padding=1),
-            nn.Conv2d(cfg.pretrained_model.features * 2, 1, 1, 1, 0),
+            BasicConv(cfg.pretrained_model.features * 3, cfg.pretrained_model.features * 3, kernel_size=3, stride=1, padding=1),
+            nn.Conv2d(cfg.pretrained_model.features * 3, 1, 1, 1, 0),
             nn.Sigmoid()
         )
         self.conf2 = nn.Sequential(
-            nn.Conv2d(4, 16, kernel_size=3, stride=1, padding=1, bias=False),
-            nn.BatchNorm2d(16),
+            nn.Conv2d(2, 4, kernel_size=3, stride=1, padding=1, bias=False),
+            nn.BatchNorm2d(4),
             nn.ReLU(inplace=True),
-            nn.Conv2d(16, 1, kernel_size=1, stride=1, padding=0, bias=True),
+            nn.Conv2d(4, 1, kernel_size=1, stride=1, padding=0, bias=True),
             nn.Sigmoid()
         )
 
@@ -203,16 +203,16 @@ class PromptStereoVx(nn.Module):
         # del prob
         # 获得融合置信度conf
         # 从代价体计算熵值, 反应某一个像素的视差可信度，[B,1,H,W]，归一化后的
-        # entropy = calculate_disparity_entropy(geometry_encoding_volume)
+        entropy = calculate_disparity_entropy(geometry_encoding_volume)
         # 计算左图和warp之后右图的差异，显式反应遮挡关系，[B,1,H,W]，归一化后的
         # error_map = get_occlusion_proxy(ctx_left[0], warped_ctx_right[0])
         # 计算梯度，反应边界位置，单目边界较模糊应该信赖锐利的双目边界，[B,1,H,W]，归一化后的
         # grad_map = self.sobel(stem_left)
         # flat_map = 1 - grad_map
         # depth [B,1,H/4,W/4], init_disp [B,1,H/4,W/4]
-        conf = self.conf(torch.cat((ctx_left[0], warped_ctx_right[0]), dim=1))
-        # 融合熵、左右图差异、梯度和置信度1得到最终置信度
-        # conf = self.conf2(torch.cat((conf, entropy, error_map, grad_map), dim=1))
+        conf = self.conf(torch.cat((ctx_left[0], warped_ctx_right[0], ctx_left[0] - warped_ctx_right[0]), dim=1))
+        # 融合熵和置信度1得到最终置信度
+        conf = self.conf2(torch.cat((conf, entropy), dim=1))
         disp = conf * init_disp + (1 - conf) * aligned_depth
 
         disp_pred = []

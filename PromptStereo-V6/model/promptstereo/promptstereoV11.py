@@ -1,5 +1,5 @@
-# 代价体采用concat_volume+corr_volume
-# 利用对齐的单目初始视差对代价体的视差维度做强化
+# 1.代价体采用concat_volume+corr_volume
+# 2.增加从代价体中回归的熵值、左右图的差异不取平均、去除梯度图用于优化融合置信度
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -10,9 +10,9 @@ from .extractor import FeatureExtractor
 from .module import *
 from util.util import *
 
-class PromptStereoV2(nn.Module):
+class PromptStereoV3(nn.Module):
     def __init__(self, cfg):
-        super(PromptStereoV2, self).__init__()
+        super(PromptStereoV3, self).__init__()
         self.cfg = cfg
 
         vit = cfg.pretrained_model.instance
@@ -60,15 +60,15 @@ class PromptStereoV2(nn.Module):
         ])
 
         self.conf = nn.Sequential(
-            BasicConv(cfg.pretrained_model.features * 2, cfg.pretrained_model.features * 2, kernel_size=3, stride=1, padding=1),
-            nn.Conv2d(cfg.pretrained_model.features * 2, 1, 1, 1, 0),
+            BasicConv(cfg.pretrained_model.features * 3, cfg.pretrained_model.features * 3, kernel_size=3, stride=1, padding=1),
+            nn.Conv2d(cfg.pretrained_model.features * 3, 1, 1, 1, 0),
             nn.Sigmoid()
         )
         self.conf2 = nn.Sequential(
-            nn.Conv2d(4, 16, kernel_size=3, stride=1, padding=1, bias=False),
-            nn.BatchNorm2d(16),
+            nn.Conv2d(2, 4, kernel_size=3, stride=1, padding=1, bias=False),
+            nn.BatchNorm2d(4),
             nn.ReLU(inplace=True),
-            nn.Conv2d(16, 1, kernel_size=1, stride=1, padding=0, bias=True),
+            nn.Conv2d(4, 1, kernel_size=1, stride=1, padding=0, bias=True),
             nn.Sigmoid()
         )
 
@@ -166,25 +166,24 @@ class PromptStereoV2(nn.Module):
         # aligned_depth = scale * depth + shift
 
         # 利用对齐后的单目视差图沿视差维度增强代价体，获得新的初始视差
-        geometry_encoding_volume = self.disp_att(geometry_encoding_volume, aligned_depth)
-
+        # geometry_encoding_volume = self.disp_att(geometry_encoding_volume, aligned_depth)
         # Init disp from geometry encoding volume [B,maxdisp//4,H/4,W/4]
-        prob = F.softmax(self.classifier(geometry_encoding_volume).squeeze(1), dim=1)
+        # prob = F.softmax(self.classifier(geometry_encoding_volume).squeeze(1), dim=1)
         # [B,1,H/4,W/4]
-        init_disp = disparity_regression(prob, self.cfg.gwc_max_disp // (2 ** self.cfg.n_downsample))
+        # init_disp = disparity_regression(prob, self.cfg.gwc_max_disp // (2 ** self.cfg.n_downsample))
 
-        del prob
+        # del prob
         # 获得融合置信度conf
         # 从代价体计算熵值[B, 1, H, W], 反应某一个像素的视差可信度
-        # entropy = calculate_disparity_entropy(geometry_encoding_volume)
+        entropy = calculate_disparity_entropy(geometry_encoding_volume)
         # 计算左图和右图warp之后的左图的差异，显式反应遮挡关系
         # error_map = get_occlusion_proxy(ctx_left[0], warped_ctx_right[0])
         # 计算梯度，反应边界位置，单目边界较模糊应该信赖锐利的双目边界
         # grad_map = self.sobel(stem_left)
         # depth [B,1,H/4,W/4], init_disp [B,1,H/4,W/4]
-        conf = self.conf(torch.cat((ctx_left[0], warped_ctx_right[0]), dim=1))
+        conf = self.conf(torch.cat((ctx_left[0], warped_ctx_right[0], ctx_left[0] - warped_ctx_right[0]), dim=1))
         # 融合熵和置信度1得到最终置信度
-        # conf = self.conf2(torch.cat((conf, entropy, error_map, grad_map), dim=1))
+        conf = self.conf2(torch.cat((conf, entropy), dim=1))
         disp = conf * init_disp + (1 - conf) * aligned_depth
 
         disp_pred = []
@@ -215,7 +214,6 @@ if __name__ == '__main__':
     import hydra
     from omegaconf import OmegaConf
     import types
-    from safetensors.torch import load_file
 
     project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     config_path = os.path.join(project_root, 'config', 'model', 'promptstereo.yaml')
@@ -244,12 +242,7 @@ if __name__ == '__main__':
     cfg.pretrained_model.instance = model_instance
 
     print("Initializing PromptStereo...")
-    model = PromptStereoV2(cfg).cuda().eval()
-
-    ckpt_path = "/data/wht/checkpoints/promptstereo/exp2/model.safetensors" 
-    from safetensors.torch import load_file
-    state_dict = load_file(ckpt_path)
-    model.load_state_dict(state_dict, strict=False)
+    model = PromptStereoV3(cfg).cuda().eval()
 
     H, W = 448, 896
     left = torch.randn(1, 3, H, W).cuda()
