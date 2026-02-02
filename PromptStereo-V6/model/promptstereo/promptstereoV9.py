@@ -1,4 +1,4 @@
-# 1.仅把代价体由gwc_volume改为comb_volume
+# 1.把代价体由gwc_volume改为comb_volume
 # 2.利用对齐的单目初始视差对代价体的视差维度做强化,此措施被移动到了3D卷积处理代价体之前，只强化gwc代价体
 import torch
 import torch.nn as nn

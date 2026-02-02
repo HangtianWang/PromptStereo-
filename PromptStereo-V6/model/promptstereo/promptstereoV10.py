@@ -1,4 +1,5 @@
-# 仅把代价体由gwc_volume改为comb_volume
+# 1.把代价体由gwc_volume改为comb_volume
+# 2.使用滑动窗口自注意力优化左右特征图，并且使用左特征图的注意力图优化gwc代价体
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
