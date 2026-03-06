@@ -732,20 +732,19 @@ class EpipolarStereoTransformer(nn.Module):
         B, C, H, W = left_feat.shape
         assert C == self.d_model, f"输入通道必须与 d_model 等价 (当前: {C} vs {self.d_model})"
         
-        # 1. 形变转换为极线序列: [B, C, H, W] -> [B*H, W, C]
+        # 形变转换为极线序列: [B, C, H, W] -> [B*H, W, C]
         left = left_feat.permute(0, 2, 3, 1).reshape(B * H, W, C)
         right = right_feat.permute(0, 2, 3, 1).reshape(B * H, W, C)
         
-        # 2. 注入位置编码
+        # 注入位置编码
         pos = self.pos_encoder(W, left.device).unsqueeze(0) # [1, W, C]
         left = left + pos
         right = right + pos
         
-        # 3. Transformer 堆叠计算
+        # Transformer 堆叠计算
         for layer in self.layers:
             left, right = layer(left, right)
             
-        # --- 视差回归 (Disparity Regression) ---
         # 使用线性层将最终特征转换为 Q 和 K
         q = self.match_proj(left)  # [BH, W, C]
         k = self.match_proj(right) # [BH, W, C]

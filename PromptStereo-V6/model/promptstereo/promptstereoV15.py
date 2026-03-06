@@ -109,16 +109,15 @@ class PromptStereoV15(nn.Module):
         # match_left shape: [B, d_model, H/4, W/4]
         init_disp = self.sttr_transformer(match_left, match_right)
     
-        # 3. 准备上采样权重 (复用你原来的凸上采样模块)
+        # 准备上采样权重
         spx_pred = None
         if not test_mode or True: # 测试时也需要上采样还原分辨率
             xspx = self.spx_4(match_left)
             xspx = self.spx_2(xspx, stem_list[0][:B])
             spx_pred = F.softmax(self.spx(xspx), 1)
         
-        # 5. 直接执行上采样
+        # 上采样
         factor = 2 ** self.cfg.n_downsample
-        # 注意: context_upsample 这个函数假设需要放大 4 倍视差值，视差值域也要乘以factor
         up_disp = context_upsample(init_disp * factor, spx_pred, factor)
 
         if test_mode:
