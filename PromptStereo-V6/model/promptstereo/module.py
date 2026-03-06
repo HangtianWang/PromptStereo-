@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import re
+import math
 from torch.distributions import Beta
 
 class BasicConv(nn.Module):
@@ -648,3 +649,128 @@ class AttentionGuidedCostRefiner(nn.Module):
         
         # 残差连接
         return cost_volume + cv_refined
+    
+
+class PositionEncodingSine1D(nn.Module):
+    def __init__(self, d_model):
+        super().__init__()
+        self.d_model = d_model
+        # 预计算频率项
+        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model))
+        self.register_buffer('div_term', div_term)
+
+    def forward(self, w, device):
+        pe = torch.zeros(w, self.d_model, device=device)
+        position = torch.arange(0, w, dtype=torch.float, device=device).unsqueeze(1)
+        pe[:, 0::2] = torch.sin(position * self.div_term)
+        pe[:, 1::2] = torch.cos(position * self.div_term)
+        return pe # [W, C]
+
+class EpipolarAttentionBlock(nn.Module):
+    def __init__(self, d_model, nhead):
+        super().__init__()
+        # 1. 自注意力 (基于官方 TransformerEncoderLayer)
+        self.self_attn = nn.TransformerEncoderLayer(
+            d_model, nhead, dim_feedforward=d_model*4, 
+            batch_first=True, norm_first=True
+        )
+        
+        # 2. 交叉注意力机制
+        self.cross_attn = nn.MultiheadAttention(d_model, nhead, batch_first=True)
+        self.norm_q = nn.LayerNorm(d_model)
+        self.norm_kv = nn.LayerNorm(d_model)
+        
+        # 前馈网络 (包含 Pre-Norm)
+        self.ffn = nn.Sequential(
+            nn.LayerNorm(d_model),
+            nn.Linear(d_model, d_model * 4), 
+            nn.GELU(), 
+            nn.Linear(d_model * 4, d_model)
+        )
+
+    def forward(self, left, right):
+        # --- A. Self Attention 阶段 ---
+        # 左图和右图虽然独立进行 Self-Attention，但我们把它们在 Batch 维度拼起来一次算完，极致提速。
+        concat = torch.cat([left, right], dim=0) # [2*BH, W, C]
+        concat = self.self_attn(concat)
+        left_self, right_self = concat.chunk(2, dim=0) # 拆开还原 [BH, W, C]
+        
+        # --- B. Cross Attention 阶段 ---
+        # 1. L 查 R: 左图去匹配右图
+        left_cross, _ = self.cross_attn(
+            self.norm_q(left_self), self.norm_kv(right_self), self.norm_kv(right_self), need_weights=False
+        )
+        left = left_self + left_cross
+        left = left + self.ffn(left)
+        
+        # 2. R 查 L: 右图反向匹配左图 (对称设计，让特征充分交流)
+        right_cross, _ = self.cross_attn(
+            self.norm_q(right_self), self.norm_kv(left_self), self.norm_kv(left_self), need_weights=False
+        )
+        right = right_self + right_cross
+        right = right + self.ffn(right)
+        
+        return left, right
+
+class EpipolarStereoTransformer(nn.Module):
+    def __init__(self, d_model=128, nhead=8, num_layers=4):
+        super().__init__()
+        self.d_model = d_model
+        
+        self.pos_encoder = PositionEncodingSine1D(d_model)
+        self.layers = nn.ModuleList([
+            EpipolarAttentionBlock(d_model, nhead) for _ in range(num_layers)
+        ])
+        
+        # 将最终特征投影一次，用于计算相关性内积
+        self.match_proj = nn.Linear(d_model, d_model)
+
+    def forward(self, left_feat, right_feat):
+        """
+        left_feat, right_feat: [B, C, H, W]  (通常是 1/4 尺寸)
+        """
+        B, C, H, W = left_feat.shape
+        assert C == self.d_model, f"输入通道必须与 d_model 等价 (当前: {C} vs {self.d_model})"
+        
+        # 1. 形变转换为极线序列: [B, C, H, W] -> [B*H, W, C]
+        left = left_feat.permute(0, 2, 3, 1).reshape(B * H, W, C)
+        right = right_feat.permute(0, 2, 3, 1).reshape(B * H, W, C)
+        
+        # 2. 注入位置编码
+        pos = self.pos_encoder(W, left.device).unsqueeze(0) # [1, W, C]
+        left = left + pos
+        right = right + pos
+        
+        # 3. Transformer 堆叠计算
+        for layer in self.layers:
+            left, right = layer(left, right)
+            
+        # --- 视差回归 (Disparity Regression) ---
+        # 使用线性层将最终特征转换为 Q 和 K
+        q = self.match_proj(left)  # [BH, W, C]
+        k = self.match_proj(right) # [BH, W, C]
+        
+        # 矩阵乘法得到稠密的 Cost Matrix [BH, W_L, W_R]
+        attn_scores = torch.bmm(q, k.transpose(1, 2)) / (self.d_model ** 0.5)
+        
+        # 几何约束 (Masking): 立体匹配中视差 >= 0，即 x_L >= x_R
+        # 我们屏蔽掉所有 x_R > x_L 的区域 (矩阵的上三角部分设为 -inf)
+        mask = torch.triu(torch.ones(W, W, device=left.device), diagonal=1).bool()
+        attn_scores.masked_fill_(mask, float('-inf'))
+        
+        # 最优传输近似 (为了极简，我们这里用标准的 Softmax 代替 Sinkhorn)
+        # 求得对于每一个左图像素在右图上的匹配概率分布
+        attn_probs = F.softmax(attn_scores, dim=-1) # [BH, W_L, W_R]
+        
+        # 计算视差期望值： d = x_L - x_R 
+        i_idx = torch.arange(W, device=left.device).view(1, W, 1) # x_L
+        j_idx = torch.arange(W, device=left.device).view(1, 1, W) # x_R
+        disp_grid = (i_idx - j_idx).float() # [1, W, W] 物理视差矩阵
+        
+        # 概率分布和视差值求点积
+        disp_1d = torch.sum(attn_probs * disp_grid, dim=-1) # [BH, W_L]
+        
+        # 还原回图像尺寸
+        init_disp = disp_1d.view(B, 1, H, W)
+        
+        return init_disp
