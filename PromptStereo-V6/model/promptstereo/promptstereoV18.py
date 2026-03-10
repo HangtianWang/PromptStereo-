@@ -1,29 +1,29 @@
-# 参考sttrTransformer，无迭代过程，注意力组计算完毕后直接回归得到视差
+# 退化的StructureEncoder，
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from accelerate import load_checkpoint_and_dispatch
 from .corr import CombinedGeometryEncodingVolume
-from .update import MultiPromptUpdateBlock
+from .update import MultiPromptUpdateBlockV3
 from .extractor import FeatureExtractor
 from .module import *
 from util.util import *
 
-class PromptStereoV15(nn.Module):
+class PromptStereoV18(nn.Module):
     def __init__(self, cfg):
-        super(PromptStereoV15, self).__init__()
+        super(PromptStereoV18, self).__init__()
         self.cfg = cfg
 
         vit = cfg.pretrained_model.instance
         vit = load_checkpoint_and_dispatch(vit, cfg.pretrained_model.checkpoint, strict=True)
 
         self.fnet = FeatureExtractor(cfg, vit.state_dict())
-        # self.update_block = MultiPromptUpdateBlock(cfg, vit.depth_head.state_dict())
+        self.update_block = MultiPromptUpdateBlockV3(cfg, vit.depth_head.state_dict())
 
         del vit
 
-        # self.hourglass = HourGlass0(cfg)
-        # self.classifier = nn.Conv3d(cfg.gwc_group, 1, 3, 1, 1, bias=False)
+        self.hourglass = HourGlass(cfg)
+        self.classifier = nn.Conv3d(cfg.gwc_group, 1, 3, 1, 1, bias=False)
 
         self.stem = nn.ModuleList([
             nn.Sequential(
@@ -44,27 +44,25 @@ class PromptStereoV15(nn.Module):
             nn.Conv2d(cfg.feat_dim[0] + cfg.stem_dim[1], cfg.feat_dim[0], kernel_size=1, stride=1, padding=0)
         )
 
-        # self.cnet = nn.ModuleList([
-        #     nn.Sequential(
-        #         BasicConv(feat_dim + stem_dim, feat_dim + stem_dim, kernel_size=3, stride=1, padding=1),
-        #         nn.Conv2d(feat_dim + stem_dim, cfg.pretrained_model.features, 1, 1, 0)
-        #     ) for feat_dim, stem_dim in zip(cfg.feat_dim, cfg.stem_dim[1:])
-        # ])
+        self.cnet = nn.ModuleList([
+            nn.Sequential(
+                BasicConv(feat_dim + stem_dim, feat_dim + stem_dim, kernel_size=3, stride=1, padding=1),
+                nn.Conv2d(feat_dim + stem_dim, cfg.pretrained_model.features, 1, 1, 0)
+            ) for feat_dim, stem_dim in zip(cfg.feat_dim, cfg.stem_dim[1:])
+        ])
         
-        # self.hnet = nn.ModuleList([
-        #     nn.Sequential(
-        #         BasicConv(cfg.pretrained_model.features * 2, cfg.pretrained_model.features * 2, kernel_size=3, stride=1, padding=1),
-        #         nn.Conv2d(cfg.pretrained_model.features * 2, cfg.pretrained_model.features, 1, 1, 0)
-        #     ) for _ in range(len(cfg.pretrained_model.out_channels))
-        # ])
+        self.hnet = nn.ModuleList([
+            nn.Sequential(
+                BasicConv(cfg.pretrained_model.features * 2, cfg.pretrained_model.features * 2, kernel_size=3, stride=1, padding=1),
+                nn.Conv2d(cfg.pretrained_model.features * 2, cfg.pretrained_model.features, 1, 1, 0)
+            ) for _ in range(len(cfg.pretrained_model.out_channels))
+        ])
 
-        # self.conf = nn.Sequential(
-        #     BasicConv(cfg.pretrained_model.features * 2, cfg.pretrained_model.features * 2, kernel_size=3, stride=1, padding=1),
-        #     nn.Conv2d(cfg.pretrained_model.features * 2, 1, 1, 1, 0),
-        #     nn.Sigmoid()
-        # )
-
-        self.sttr_transformer = EpipolarStereoTransformer(d_model=self.cfg.feat_dim[0], nhead=8, num_layers=4)
+        self.conf = nn.Sequential(
+            BasicConv(cfg.pretrained_model.features * 2, cfg.pretrained_model.features * 2, kernel_size=3, stride=1, padding=1),
+            nn.Conv2d(cfg.pretrained_model.features * 2, 1, 1, 1, 0),
+            nn.Sigmoid()
+        )
 
     def freeze_bn(self):
         for m in self.modules():
@@ -106,31 +104,58 @@ class PromptStereoV15(nn.Module):
         match_left = self.desc(torch.cat((feat_left[0], stem_list[1][:B]), dim=1))
         match_right = self.desc(torch.cat((feat_right[0], stem_list[1][B:]), dim=1))
 
-        # match_left shape: [B, d_model, H/4, W/4]
-        init_disp = self.sttr_transformer(match_left, match_right)
-    
-        # 准备上采样权重
-        spx_pred = None
-        if not test_mode or True: # 测试时也需要上采样还原分辨率
+        gwc_volume = build_gwc_volume(match_left, match_right, self.cfg.gwc_max_disp // (self.cfg.n_downsample ** 2), self.cfg.gwc_group)
+        concat_volume = build_concat_volume(match_left, match_right, self.cfg.gwc_max_disp // (2 ** self.cfg.n_downsample))
+        comb_volume = torch.cat([gwc_volume, concat_volume], dim=1)
+        geometry_encoding_volume = self.hourglass(comb_volume, feat_left)
+        prob = F.softmax(self.classifier(geometry_encoding_volume).squeeze(1), dim=1)
+        init_disp = disparity_regression(prob, self.cfg.gwc_max_disp // (self.cfg.n_downsample ** 2))
+
+        del gwc_volume, concat_volume, comb_volume, prob
+
+        if not test_mode:
             xspx = self.spx_4(match_left)
             xspx = self.spx_2(xspx, stem_list[0][:B])
-            spx_pred = F.softmax(self.spx(xspx), 1)
-        
-        # 上采样
-        factor = 2 ** self.cfg.n_downsample
-        up_disp = context_upsample(init_disp * factor, spx_pred, factor)
+            spx_pred = self.spx(xspx)
+            spx_pred = F.softmax(spx_pred, 1)
 
+        corr_block = CombinedGeometryEncodingVolume(match_left, match_right, geometry_encoding_volume, self.cfg.corr_level, self.cfg.corr_radius)
+
+        ctx_stereo = [block(torch.cat((x, y), dim=1)) for block, x, y in zip(self.cnet, feat_stereo, stem_list[1:])]
+        ctx_left = [stereo[:B] for stereo in ctx_stereo]
+        ctx_right = [stereo[B:] for stereo in ctx_stereo]
+        warped_ctx_right = fmap_sampler(ctx_right, init_disp)
+        net = [block(torch.cat((x, y), dim=1)) for block, x, y in zip(self.hnet, ctx_left, warped_ctx_right)]
+
+        conf = self.conf(torch.cat((ctx_left[0], warped_ctx_right[0]), dim=1))
+        norm_depth, _, _ = normalize_disparity(depth)
+        _, scale, shift = normalize_disparity(init_disp)
+        aligned_depth = norm_depth * scale[..., None, None] + shift[..., None, None]
+        disp = conf * init_disp + (1 - conf) * aligned_depth
+        
+        # 可视化时用
+        # self.debug_fused_disp = disp
+
+        disp_pred = []
+        for itr in range(iters):
+            disp = disp.detach()
+            corr = corr_block(disp)
+            net, delta_disp, mask = self.update_block(net, corr, disp, ctx_mono, norm_depth, conf)
+            disp = disp + delta_disp
+
+            if test_mode and itr < iters - 1:
+                continue
+
+            up_disp = self.upsample_disp(disp, mask)
+            disp_pred.append(up_disp)
+        
         if test_mode:
             return up_disp
-        else:
-            init_disp_full = F.interpolate(
-                init_disp * factor,  # 值域放大 4 倍
-                size=(H, W),     # 尺寸放大到全尺寸
-                mode='bilinear', 
-                align_corners=True
-            )
-            
-            return init_disp_full * factor, [up_disp] 
+
+        factor = 2 ** self.cfg.n_downsample
+        init_disp = context_upsample(init_disp * 4, spx_pred, factor)
+
+        return init_disp, disp_pred
     
 
 if __name__ == '__main__':
@@ -138,7 +163,6 @@ if __name__ == '__main__':
     import hydra
     from omegaconf import OmegaConf
     import types
-    from safetensors.torch import load_file
 
     project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     config_path = os.path.join(project_root, 'config', 'model', 'promptstereo.yaml')
@@ -167,12 +191,7 @@ if __name__ == '__main__':
     cfg.pretrained_model.instance = model_instance
 
     print("Initializing PromptStereo...")
-    model = PromptStereoV15(cfg).cuda().eval()
-
-    # ckpt_path = "/data/wht/checkpoints/promptstereo/exp2/model.safetensors" 
-    # from safetensors.torch import load_file
-    # state_dict = load_file(ckpt_path)
-    # model.load_state_dict(state_dict, strict=False)
+    model = PromptStereoV18(cfg).cuda().eval()
 
     H, W = 448, 896
     left = torch.randn(1, 3, H, W).cuda()

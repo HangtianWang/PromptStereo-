@@ -55,6 +55,39 @@ class ResidualConvUnit(nn.Module):
 
         return self.skip_add.add(out, x)
 
+
+# 用于V18
+class StructureEncoderV3(nn.Module):
+    def __init__(self, cfg):
+        super(StructureEncoderV3, self).__init__()
+        # self.convc1 = nn.Conv2d(cfg.pretrained_model.features // 2, cfg.pretrained_model.features // 2, 1, padding=0)
+        # self.convc2 = nn.Conv2d(cfg.pretrained_model.features // 2, cfg.pretrained_model.features // 2, 3, padding=1)
+        # self.convd1 = nn.Conv2d(1, cfg.pretrained_model.features // 2, 7, padding=3)
+        # self.convd2 = nn.Conv2d(cfg.pretrained_model.features // 2, cfg.pretrained_model.features // 2, 3, padding=1)
+        # self.convcf1 = nn.Conv2d(1, cfg.pretrained_model.features // 2, 7, padding=3)
+        # self.convcf2 = nn.Conv2d(cfg.pretrained_model.features // 2, cfg.pretrained_model.features // 2, 3, padding=1)
+        # self.conv = nn.Conv2d((cfg.pretrained_model.features // 2) * 3 , cfg.pretrained_model.features - 2, 3, padding=1)
+
+        self.conv_allin_one = nn.Conv2d(cfg.pretrained_model.features // 2 + 3, cfg.pretrained_model.features, 1, padding=0)
+
+    def forward(self, ctx, norm_depth, norm_disp, conf):
+        # diff = torch.abs(norm_depth - norm_disp)
+
+        # c = F.relu(self.convc1(ctx), True)
+        # c = F.relu(self.convc2(c), True)
+        # d = F.relu(self.convd1(diff), True)
+        # d = F.relu(self.convd2(d), True)
+        # cf = F.relu(self.convcf1(conf), True)
+        # cf = F.relu(self.convcf2(cf), True)
+
+        # out = torch.cat((c, d, cf), dim=1)
+        # out = F.relu(self.conv(out), True)
+
+        out = F.relu(self.conv_allin_one(torch.cat((ctx, norm_depth, norm_disp, conf), dim=1)), True)
+
+        # return torch.cat((out, diff, conf), dim=1)
+        return out
+
 # 用于V5，改进的StructureEncoder，可以利用conf
 class StructureEncoderV2(nn.Module):
     def __init__(self, cfg):
@@ -284,6 +317,78 @@ class MultiPromptUpdateBlockV2(nn.Module):
         self.stereo_pru = nn.ModuleList([PromptStereoRecurrentUnit(cfg, features=cfg.pretrained_model.features, bn=cfg.pretrained_model.use_bn, motion=(i == 0)) for i in range(len(cfg.pretrained_model.out_channels))])
         # self.stereo_align = nn.ModuleList([nn.Conv2d(cfg.pretrained_model.features, cfg.pretrained_model.features, 1, 1, 0) for _ in range(len(cfg.pretrained_model.out_channels))])
         self.structure_encoder = StructureEncoderV2(cfg)
+        self.motion_encoder = MotionEncoder(cfg)
+        self.disp_head = DispHead(cfg)
+        self.mask = nn.Sequential(
+            nn.Conv2d(cfg.pretrained_model.features, cfg.pretrained_model.features, 3, 1, 1),
+            nn.ReLU(True),
+            nn.Conv2d(cfg.pretrained_model.features, (2 ** cfg.n_downsample ** 2) * 9, 1, padding=0)
+        )
+
+        self.update = nn.ModuleList([
+            nn.Sequential(
+                BasicConv(cfg.pretrained_model.features * (2 + (i == 0)), cfg.pretrained_model.features, kernel_size=3, stride=1, padding=1),
+                nn.Conv2d(cfg.pretrained_model.features, cfg.pretrained_model.features, kernel_size=1, stride=1, padding=0),
+                nn.Sigmoid()                
+            ) for i in range(len(cfg.pretrained_model.out_channels))
+        ])
+        
+        if pretrained_state:
+            block_state = self.state_dict()
+            new_dict = {}
+
+            for i in range(len(cfg.pretrained_model.out_channels)):
+                ref_name = f'scratch.refinenet{i + 1}'
+                for module_name in ['mono_pru', 'stereo_pru']:
+                    tar_name = f'{module_name}.{i}'
+
+                    for k, v in pretrained_state.items():
+                        if k.startswith(ref_name):
+                            new_k = k.replace(ref_name, tar_name)
+                            if new_k in block_state:
+                                new_dict[new_k] = v
+                
+            block_state.update(new_dict)
+            self.load_state_dict(block_state, strict=True)
+        
+    def forward(self, net, corr, disp, ctx, norm_depth, conf):
+        norm_disp, _, _ = normalize_disparity(disp)
+        structure = self.structure_encoder(ctx, norm_depth, norm_disp, conf)
+        motion = self.motion_encoder(corr, disp)
+
+        '''
+        for i in reversed(range(len(net))):
+            if (i == len(net) - 1):
+                net[i] = net[i] + self.stereo_align[i](self.stereo_pru[i](net[i]))
+            elif (i == 0):
+                net[i] = net[i] + self.stereo_align[i](self.stereo_pru[i](net[i], interp(net[i + 1], net[i]), corr=corr, disp=disp, ctx=ctx, norm_depth=norm_depth, norm_disp=norm_disp))
+            else:
+                net[i] = net[i] + self.stereo_align[i](self.stereo_pru[i](net[i], interp(net[i + 1], net[i])))
+        '''
+
+        for i in reversed(range(len(net))):
+            if (i == len(net) - 1):
+                z = self.update[i](torch.cat([net[i], pool2x(net[i - 1])], dim=1))
+                net[i] = (1 - z) * net[i] + z * (self.stereo_pru[i](net[i]))
+            elif (i == 0):
+                z = self.update[i](torch.cat([net[i], structure, motion], dim=1))
+                net[i] = (1 - z) * net[i] + z * (self.stereo_pru[i](net[i], interp(net[i + 1], net[i]), structure=structure, motion=motion))
+            else:
+                z = self.update[i](torch.cat([net[i], pool2x(net[i - 1])], dim=1))
+                net[i] = (1 - z) * net[i] + z * (self.stereo_pru[i](net[i], interp(net[i + 1], net[i])))
+
+        delta_disp = self.disp_head(net[0])
+        mask = .25 * self.mask(net[0])
+
+        return net, delta_disp, mask
+
+# 用于V18，退化的StructureEncoder，与v5形成对比
+class MultiPromptUpdateBlockV3(nn.Module):
+    def __init__(self, cfg, pretrained_state):
+        super(MultiPromptUpdateBlockV3, self).__init__()
+        self.stereo_pru = nn.ModuleList([PromptStereoRecurrentUnit(cfg, features=cfg.pretrained_model.features, bn=cfg.pretrained_model.use_bn, motion=(i == 0)) for i in range(len(cfg.pretrained_model.out_channels))])
+        # self.stereo_align = nn.ModuleList([nn.Conv2d(cfg.pretrained_model.features, cfg.pretrained_model.features, 1, 1, 0) for _ in range(len(cfg.pretrained_model.out_channels))])
+        self.structure_encoder = StructureEncoderV3(cfg)
         self.motion_encoder = MotionEncoder(cfg)
         self.disp_head = DispHead(cfg)
         self.mask = nn.Sequential(

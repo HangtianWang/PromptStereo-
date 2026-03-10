@@ -15,3 +15,5 @@ from .promptstereoV13 import PromptStereoV13
 from .promptstereoV14 import PromptStereoV14
 from .promptstereoV15 import PromptStereoV15
 from .promptstereoV16 import PromptStereoV16
+from .promptstereoV17 import PromptStereoV17
+from .promptstereoV18 import PromptStereoV18
