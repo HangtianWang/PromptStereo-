@@ -107,6 +107,7 @@ class PromptStereoV15(nn.Module):
         match_right = self.desc(torch.cat((feat_right[0], stem_list[1][B:]), dim=1))
 
         # match_left shape: [B, d_model, H/4, W/4]
+        # [B,1,H/4,W/4]
         init_disp = self.sttr_transformer(match_left, match_right)
     
         # 准备上采样权重
@@ -130,7 +131,7 @@ class PromptStereoV15(nn.Module):
                 align_corners=True
             )
             
-            return init_disp_full * factor, [up_disp] 
+            return init_disp_full, [up_disp] 
     
 
 if __name__ == '__main__':

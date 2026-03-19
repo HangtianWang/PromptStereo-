@@ -713,7 +713,7 @@ class EpipolarAttentionBlock(nn.Module):
         return left, right
 
 class EpipolarStereoTransformer(nn.Module):
-    def __init__(self, d_model=128, nhead=8, num_layers=4):
+    def __init__(self, d_model=128, nhead=8, num_layers=6):
         super().__init__()
         self.d_model = d_model
         
@@ -727,12 +727,12 @@ class EpipolarStereoTransformer(nn.Module):
 
     def forward(self, left_feat, right_feat):
         """
-        left_feat, right_feat: [B, C, H, W]  (通常是 1/4 尺寸)
+        left_feat, right_feat: [B, C, H/4, W/4]
         """
         B, C, H, W = left_feat.shape
         assert C == self.d_model, f"输入通道必须与 d_model 等价 (当前: {C} vs {self.d_model})"
         
-        # 形变转换为极线序列: [B, C, H, W] -> [B*H, W, C]
+        # 形变转换为极线序列: [B, C, H/4, W/4] -> [B*H/4, W/4, C]
         left = left_feat.permute(0, 2, 3, 1).reshape(B * H, W, C)
         right = right_feat.permute(0, 2, 3, 1).reshape(B * H, W, C)
         
@@ -746,20 +746,20 @@ class EpipolarStereoTransformer(nn.Module):
             left, right = layer(left, right)
             
         # 使用线性层将最终特征转换为 Q 和 K
-        q = self.match_proj(left)  # [BH, W, C]
-        k = self.match_proj(right) # [BH, W, C]
+        q = self.match_proj(left)  # [BH/4, W/4, C]
+        k = self.match_proj(right) # [BH/4, W/4, C]
         
-        # 矩阵乘法得到稠密的 Cost Matrix [BH, W_L, W_R]
+        # 矩阵乘法得到稠密的注意力图 [BH/4, W/4, W/4]
         attn_scores = torch.bmm(q, k.transpose(1, 2)) / (self.d_model ** 0.5)
         
-        # 几何约束 (Masking): 立体匹配中视差 >= 0，即 x_L >= x_R
-        # 我们屏蔽掉所有 x_R > x_L 的区域 (矩阵的上三角部分设为 -inf)
+        # 几何约束: 立体匹配中视差 >= 0，即 x_L >= x_R
+        # 我们屏蔽掉所有 x_R > x_L 的区域
         mask = torch.triu(torch.ones(W, W, device=left.device), diagonal=1).bool()
         attn_scores.masked_fill_(mask, float('-inf'))
         
-        # 最优传输近似 (为了极简，我们这里用标准的 Softmax 代替 Sinkhorn)
+        # Softmax 代替 Sinkhorn 回归得到视差
         # 求得对于每一个左图像素在右图上的匹配概率分布
-        attn_probs = F.softmax(attn_scores, dim=-1) # [BH, W_L, W_R]
+        attn_probs = F.softmax(attn_scores, dim=-1) # [BH/4, W/4, W/4]
         
         # 计算视差期望值： d = x_L - x_R 
         i_idx = torch.arange(W, device=left.device).view(1, W, 1) # x_L
@@ -767,7 +767,7 @@ class EpipolarStereoTransformer(nn.Module):
         disp_grid = (i_idx - j_idx).float() # [1, W, W] 物理视差矩阵
         
         # 概率分布和视差值求点积
-        disp_1d = torch.sum(attn_probs * disp_grid, dim=-1) # [BH, W_L]
+        disp_1d = torch.sum(attn_probs * disp_grid, dim=-1) # [BH/4, W/4]
         
         # 还原回图像尺寸
         init_disp = disp_1d.view(B, 1, H, W)
