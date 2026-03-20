@@ -22,7 +22,7 @@ tracker:
   init_kwargs:
     wandb:
       entity: null
-      name: exp17
+      name: exp15-2
 
 aug_params:
   crop_size: [384, 768]
@@ -159,5 +159,5 @@ scheduler:
 max_disp: 192
 max_norm: 1.0
 save_freq: 100000
-save_path: /data/wht/checkpoints/promptstereo/exp17
+save_path: /data/wht/checkpoints/promptstereo/exp15
 valid_freq: 10000

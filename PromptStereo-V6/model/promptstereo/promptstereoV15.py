@@ -102,11 +102,10 @@ class PromptStereoV15(nn.Module):
                 stem_list.append(block(stem_list[-1]))
             else:
                 stem_list.append(block(torch.cat((stem_left, stem_right), dim=0)))
-
+        # [B, C, H/4, W/4]
         match_left = self.desc(torch.cat((feat_left[0], stem_list[1][:B]), dim=1))
         match_right = self.desc(torch.cat((feat_right[0], stem_list[1][B:]), dim=1))
 
-        # match_left shape: [B, d_model, H/4, W/4]
         # [B,1,H/4,W/4]
         init_disp = self.sttr_transformer(match_left, match_right)
     

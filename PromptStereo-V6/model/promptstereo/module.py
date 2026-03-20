@@ -713,7 +713,7 @@ class EpipolarAttentionBlock(nn.Module):
         return left, right
 
 class EpipolarStereoTransformer(nn.Module):
-    def __init__(self, d_model=128, nhead=8, num_layers=6):
+    def __init__(self, d_model=128, nhead=8, num_layers=12):
         super().__init__()
         self.d_model = d_model
         
